@@ -421,6 +421,7 @@ setup_constraint_info (ConstraintInfo      *info,
     meta_workspace_get_onxinerama_region (cur_workspace, 
                                           xinerama_info->number);
 
+#if 0
   /* Workaround braindead legacy apps that don't know how to
    * fullscreen themselves properly.
    */
@@ -437,6 +438,7 @@ setup_constraint_info (ConstraintInfo      *info,
                   window->desc);
       meta_window_make_fullscreen_internal (window);
     }
+#endif
 
   /* Log all this information for debugging */
   meta_topic (META_DEBUG_GEOMETRY,
