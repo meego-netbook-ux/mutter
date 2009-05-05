@@ -940,7 +940,10 @@ meta_screen_grab_all_keys (MetaScreen *screen, guint32 timestamp)
               "Grabbing all keys on RootWindow\n");
   retval = grab_keyboard (screen->display, screen->xroot, timestamp);
   if (retval)
-    screen->all_keys_grabbed = TRUE;
+    {
+      screen->all_keys_grabbed = TRUE;
+      g_object_notify (G_OBJECT (screen), "keyboard-grabbed");
+    }
   else
     meta_screen_grab_keys (screen);
 
@@ -959,6 +962,7 @@ meta_screen_ungrab_all_keys (MetaScreen *screen, guint32 timestamp)
 
       /* Re-establish our standard bindings */
       meta_screen_grab_keys (screen);
+      g_object_notify (G_OBJECT (screen), "keyboard-grabbed");
     }
 }
 
@@ -2045,7 +2049,6 @@ process_tab_grab (MetaDisplay *display,
   gboolean popup_not_showing;
   gboolean backward;
   gboolean key_used;
-  Window      prev_xwindow;
   MetaWindow *prev_window;
 
   if (screen != display->grab_screen)
@@ -2061,7 +2064,7 @@ process_tab_grab (MetaDisplay *display,
    * implementing Alt+Tab & Co., we call this custom handler; we do not
    * mess about with the grab, as that is up to the handler to deal with.
    */
-  if (!screen->tab_popup)
+  if (!screen->tab_handler)
     {
       MetaKeyHandler *handler = NULL;
       const gchar    *handler_name = NULL;
@@ -2130,13 +2133,9 @@ process_tab_grab (MetaDisplay *display,
       end_keyboard_grab (display, event->xkey.keycode))
     {
       /* We're done, move to the new window. */
-      Window target_xwindow;
       MetaWindow *target_window;
 
-      target_xwindow =
-        (Window) meta_ui_tab_popup_get_selected (screen->tab_popup);
-      target_window =
-        meta_display_lookup_x_window (display, target_xwindow);
+      target_window = meta_screen_tab_popup_get_selected (screen);
 
       meta_topic (META_DEBUG_KEYBINDINGS,
                   "Ending tab operation, primary modifier released\n");
@@ -2172,8 +2171,7 @@ process_tab_grab (MetaDisplay *display,
   if (is_modifier (display, event->xkey.keycode))
     return TRUE;
 
-  prev_xwindow = (Window) meta_ui_tab_popup_get_selected (screen->tab_popup);
-  prev_window  = meta_display_lookup_x_window (display, prev_xwindow);
+  prev_window = meta_screen_tab_popup_get_selected (screen);
 
   /* Cancel when alt-Escape is pressed during using alt-Tab, and vice
    * versa.
@@ -2293,25 +2291,21 @@ process_tab_grab (MetaDisplay *display,
         backward = !backward;
 
       if (backward)
-        meta_ui_tab_popup_backward (screen->tab_popup);
+        meta_screen_tab_popup_backward (screen);
       else
-        meta_ui_tab_popup_forward (screen->tab_popup);
+        meta_screen_tab_popup_forward (screen);
       
       if (popup_not_showing)
         {
           /* We can't actually change window focus, due to the grab.
            * but raise the window.
            */
-          Window target_xwindow;
           MetaWindow *target_window;
 
           meta_stack_set_positions (screen->stack,
                                     display->grab_old_window_stacking);
 
-          target_xwindow =
-            (Window) meta_ui_tab_popup_get_selected (screen->tab_popup);
-          target_window =
-            meta_display_lookup_x_window (display, target_xwindow);
+          target_window = meta_screen_tab_popup_get_selected (screen);
           
           if (prev_window && prev_window->tab_unminimized)
             {
@@ -2730,7 +2724,7 @@ process_workspace_switch_grab (MetaDisplay *display,
 {
   MetaWorkspace *workspace;
 
-  if (screen != display->grab_screen || !screen->tab_popup)
+  if (screen != display->grab_screen || !screen->ws_popup)
     return FALSE;
 
   if (event->type == KeyRelease &&
@@ -2739,8 +2733,7 @@ process_workspace_switch_grab (MetaDisplay *display,
       /* We're done, move to the new workspace. */
       MetaWorkspace *target_workspace;
 
-      target_workspace =
-        (MetaWorkspace *) meta_ui_tab_popup_get_selected (screen->tab_popup);
+      target_workspace = meta_screen_workspace_popup_get_selected (screen);
 
       meta_topic (META_DEBUG_KEYBINDINGS,
                   "Ending workspace tab operation, primary modifier released\n");
@@ -2775,9 +2768,8 @@ process_workspace_switch_grab (MetaDisplay *display,
   if (is_modifier (display, event->xkey.keycode))
     return TRUE;
 
-  /* select the next workspace in the tabpopup */
-  workspace =
-    (MetaWorkspace *) meta_ui_tab_popup_get_selected (screen->tab_popup);
+  /* select the next workspace in the popup */
+  workspace = meta_screen_workspace_popup_get_selected (screen);
   
   if (workspace)
     {
@@ -2818,8 +2810,7 @@ process_workspace_switch_grab (MetaDisplay *display,
 
       if (target_workspace)
         {
-          meta_ui_tab_popup_select (screen->tab_popup,
-                                    (MetaTabEntryKey) target_workspace);
+          meta_screen_workspace_popup_select (screen, target_workspace);
           meta_topic (META_DEBUG_KEYBINDINGS,
                       "Tab key pressed, moving tab focus in popup\n");
 
@@ -2835,8 +2826,7 @@ process_workspace_switch_grab (MetaDisplay *display,
   /* end grab */
   meta_topic (META_DEBUG_KEYBINDINGS,
               "Ending workspace tabbing & focusing default window; uninteresting key pressed\n");
-  workspace =
-    (MetaWorkspace *) meta_ui_tab_popup_get_selected (screen->tab_popup);
+  workspace = meta_screen_workspace_popup_get_selected (screen);
   meta_workspace_focus_default_window (workspace, NULL, event->xkey.time);
   return FALSE;
 }
@@ -3020,68 +3010,71 @@ do_choose_window (MetaDisplay    *display,
               "Initially selecting window %s\n",
               initial_selection ? initial_selection->desc : "(none)");  
 
-  if (initial_selection != NULL)
-    {
-      if (binding->mask == 0)
-        {
-          /* If no modifiers, we can't do the "hold down modifier to keep
-           * moving" thing, so we just instaswitch by one window.
-           */
-          meta_topic (META_DEBUG_FOCUS,
-                      "Activating %s and turning off mouse_mode due to "
-                      "switch/cycle windows with no modifiers\n",
-                      initial_selection->desc);
-          display->mouse_mode = FALSE;
-          meta_window_activate (initial_selection, event->xkey.time);
-        }
-      else if (!meta_prefs_get_no_tab_popup ())
-        {
-          if (meta_display_begin_grab_op (display,
-                                           screen,
-                                           NULL,
-                                           show_popup ?
-                                           tab_op_from_tab_type (type) :
-                                           cycle_op_from_tab_type (type),
-                                           FALSE,
-                                           FALSE,
-                                           0,
-                                           binding->mask,
-                                           event->xkey.time,
-                                           0, 0))
-        {
-          if (!primary_modifier_still_pressed (display,
-                                               binding->mask))
-            {
-              /* This handles a race where modifier might be released
-               * before we establish the grab. must end grab
-               * prior to trying to focus a window.
-               */
-              meta_topic (META_DEBUG_FOCUS, 
-                          "Ending grab, activating %s, and turning off "
-                          "mouse_mode due to switch/cycle windows where "
-                          "modifier was released prior to grab\n",
-                          initial_selection->desc);
-              meta_display_end_grab_op (display, event->xkey.time);
-              display->mouse_mode = FALSE;
-              meta_window_activate (initial_selection, event->xkey.time);
-            }
-          else
-            {
-              meta_ui_tab_popup_select (screen->tab_popup,
-                                        (MetaTabEntryKey) initial_selection->xwindow);
+  if (initial_selection == NULL)
+    return;
 
-              if (show_popup)
-                    meta_ui_tab_popup_set_showing (screen->tab_popup, TRUE);
-              else
-                {
-                  meta_window_raise (initial_selection);
-                  initial_selection->tab_unminimized =
-                    initial_selection->minimized;
-                  meta_window_unminimize (initial_selection);
-                }
-            }
-        }
+  if (binding->mask == 0)
+    {
+      /* If no modifiers, we can't do the "hold down modifier to keep
+       * moving" thing, so we just instaswitch by one window.
+       */
+      meta_topic (META_DEBUG_FOCUS,
+                  "Activating %s and turning off mouse_mode due to "
+                  "switch/cycle windows with no modifiers\n",
+                  initial_selection->desc);
+      display->mouse_mode = FALSE;
+      meta_window_activate (initial_selection, event->xkey.time);
+      return;
     }
+
+  if (meta_prefs_get_no_tab_popup ())
+    {
+      /* FIXME? Shouldn't this be merged with the previous case? */
+      return;
+    }
+
+  if (!meta_display_begin_grab_op (display,
+                                   screen,
+                                   NULL,
+                                   show_popup ?
+                                   tab_op_from_tab_type (type) :
+                                   cycle_op_from_tab_type (type),
+                                   FALSE,
+                                   FALSE,
+                                   0,
+                                   binding->mask,
+                                   event->xkey.time,
+                                   0, 0))
+    return;
+
+  if (!primary_modifier_still_pressed (display, binding->mask))
+    {
+      /* This handles a race where modifier might be released before
+       * we establish the grab. must end grab prior to trying to focus
+       * a window.
+       */
+      meta_topic (META_DEBUG_FOCUS, 
+                  "Ending grab, activating %s, and turning off "
+                  "mouse_mode due to switch/cycle windows where "
+                  "modifier was released prior to grab\n",
+                  initial_selection->desc);
+      meta_display_end_grab_op (display, event->xkey.time);
+      display->mouse_mode = FALSE;
+      meta_window_activate (initial_selection, event->xkey.time);
+      return;
+    }
+
+  meta_screen_tab_popup_create (screen, type,
+                                show_popup ? META_TAB_SHOW_ICON :
+                                META_TAB_SHOW_INSTANTLY,
+                                initial_selection);
+
+  if (!show_popup)
+    {
+      meta_window_raise (initial_selection);
+      initial_selection->tab_unminimized =
+        initial_selection->minimized;
+      meta_window_unminimize (initial_selection);
     }
 }
 
@@ -3408,7 +3401,9 @@ handle_workspace_switch  (MetaDisplay    *display,
 {
   gint motion = binding->handler->data;
   unsigned int grab_mask;
-     
+  MetaWorkspace *next;
+  gboolean grabbed_before_release;
+
   g_assert (motion < 0); 
 
   meta_topic (META_DEBUG_KEYBINDINGS,
@@ -3417,48 +3412,39 @@ handle_workspace_switch  (MetaDisplay    *display,
   /* FIXME should we use binding->mask ? */
   grab_mask = event->xkey.state & ~(display->ignored_modifier_mask);
   
-  if (meta_display_begin_grab_op (display,
-                                  screen,
-                                  NULL,
-                                  META_GRAB_OP_KEYBOARD_WORKSPACE_SWITCHING,
-                                  FALSE,
-                                  FALSE,
-                                  0,
-                                  grab_mask,
-                                  event->xkey.time,
-                                  0, 0))
+  if (!meta_display_begin_grab_op (display,
+                                   screen,
+                                   NULL,
+                                   META_GRAB_OP_KEYBOARD_WORKSPACE_SWITCHING,
+                                   FALSE,
+                                   FALSE,
+                                   0,
+                                   grab_mask,
+                                   event->xkey.time,
+                                   0, 0))
+    return;
+
+  next = meta_workspace_get_neighbor (screen->active_workspace, motion);
+  g_assert (next); 
+
+  grabbed_before_release = primary_modifier_still_pressed (display, grab_mask);
+
+  meta_topic (META_DEBUG_KEYBINDINGS, "Activating target workspace\n");
+
+  if (!grabbed_before_release)
     {
-      MetaWorkspace *next;
-      gboolean grabbed_before_release;
-      
-      next = meta_workspace_get_neighbor (screen->active_workspace, motion);
-      g_assert (next); 
-
-      grabbed_before_release = primary_modifier_still_pressed (display, grab_mask);
-      
-      meta_topic (META_DEBUG_KEYBINDINGS,
-		  "Activating target workspace\n");
-
-      if (!grabbed_before_release)
-        {
-          /* end the grab right away, modifier possibly released
-           * before we could establish the grab and receive the
-           * release event. Must end grab before we can switch
-           * spaces.
-           */
-          meta_display_end_grab_op (display, event->xkey.time);
-        }
-      
-      meta_workspace_activate (next, event->xkey.time);
-
-      if (grabbed_before_release && !meta_prefs_get_no_tab_popup ())
-        {
-          meta_ui_tab_popup_select (screen->tab_popup, (MetaTabEntryKey) next);
-          
-          /* only after selecting proper space */
-          meta_ui_tab_popup_set_showing (screen->tab_popup, TRUE);
-        }
+      /* end the grab right away, modifier possibly released
+       * before we could establish the grab and receive the
+       * release event. Must end grab before we can switch
+       * spaces.
+       */
+      meta_display_end_grab_op (display, event->xkey.time);
     }
+
+  meta_workspace_activate (next, event->xkey.time);
+
+  if (grabbed_before_release && !meta_prefs_get_no_tab_popup ())
+    meta_screen_workspace_popup_create (screen, next);
 }
 
 static void

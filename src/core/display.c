@@ -1475,14 +1475,7 @@ event_callback (XEvent   *event,
   
   modified = event_get_modified_window (display, event);
   
-  if (event->type == ButtonPress)
-    {
-      /* filter out scrollwheel */
-      if (event->xbutton.button == 4 ||
-	  event->xbutton.button == 5)
-	return FALSE;
-    }
-  else if (event->type == UnmapNotify)
+  if (event->type == UnmapNotify)
     {
       if (meta_ui_window_should_not_cause_focus (display->xdisplay,
                                                  modified))
@@ -1625,7 +1618,18 @@ event_callback (XEvent   *event,
       meta_display_process_key_event (display, window, event);
       break;
     case ButtonPress:
-      if ((window &&
+      if (event->xbutton.button == 4 || event->xbutton.button == 5)
+        {
+          if (display->compositor && window)
+            {
+              return meta_compositor_process_event (display->compositor,
+                                                    event,
+                                                    window);
+            }
+          else
+            return FALSE;
+        }
+      else if ((window &&
            grab_op_is_mouse (display->grab_op) &&
            display->grab_button != (int) event->xbutton.button &&
            display->grab_window == window) ||
@@ -3512,48 +3516,6 @@ meta_display_begin_grab_op (MetaDisplay *display,
         meta_stack_get_positions (screen->stack);
     }
 
-  /* Do this last, after everything is set up. */
-  switch (op)
-    {
-    case META_GRAB_OP_KEYBOARD_TABBING_NORMAL:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_NORMAL,
-                                    META_TAB_SHOW_ICON);
-      break;
-    case META_GRAB_OP_KEYBOARD_ESCAPING_NORMAL:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_NORMAL,
-                                    META_TAB_SHOW_INSTANTLY);
-      break;
-
-    case META_GRAB_OP_KEYBOARD_TABBING_DOCK:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_DOCKS,
-                                    META_TAB_SHOW_ICON);
-      break;
-    case META_GRAB_OP_KEYBOARD_ESCAPING_DOCK:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_DOCKS,
-                                    META_TAB_SHOW_INSTANTLY);
-      break;
-    case META_GRAB_OP_KEYBOARD_TABBING_GROUP:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_GROUP,
-                                    META_TAB_SHOW_ICON);
-      break;
-     case META_GRAB_OP_KEYBOARD_ESCAPING_GROUP:
-      meta_screen_ensure_tab_popup (screen,
-                                    META_TAB_LIST_GROUP,
-                                    META_TAB_SHOW_INSTANTLY);
-      
-    case META_GRAB_OP_KEYBOARD_WORKSPACE_SWITCHING:
-      meta_screen_ensure_workspace_popup (screen);
-      break;
-
-    default:
-      break;
-    }
-
   if (display->grab_window)
     {
       meta_window_refresh_resize_popup (display->grab_window);
@@ -3593,11 +3555,10 @@ meta_display_end_grab_op (MetaDisplay *display,
   if (GRAB_OP_IS_WINDOW_SWITCH (display->grab_op) ||
       display->grab_op == META_GRAB_OP_KEYBOARD_WORKSPACE_SWITCHING)
     {
-      if (display->grab_screen->tab_popup)
-        {
-          meta_ui_tab_popup_free (display->grab_screen->tab_popup);
-          display->grab_screen->tab_popup = NULL;
-        }
+      if (GRAB_OP_IS_WINDOW_SWITCH (display->grab_op))
+        meta_screen_tab_popup_destroy (display->grab_screen);
+      else
+        meta_screen_workspace_popup_destroy (display->grab_screen);
 
       /* If the ungrab here causes an EnterNotify, ignore it for
        * sloppy focus
