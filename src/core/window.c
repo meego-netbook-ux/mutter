@@ -6556,6 +6556,10 @@ recalc_window_type (MetaWindow *window)
 
       if (old_decorated != window->decorated)
         g_object_notify (G_OBJECT (window), "decorated");
+
+      if (old_type == META_WINDOW_MODAL_DIALOG ||
+          window->type == META_WINDOW_MODAL_DIALOG)
+        g_object_notify (G_OBJECT (window), "modal");
     }
 }
 
