@@ -140,6 +140,7 @@ enum {
   PROP_MINI_ICON,
   PROP_DECORATED,
   PROP_FULLSCREEN,
+  PROP_MODAL,
 };
 
 enum
@@ -202,6 +203,10 @@ meta_window_get_property(GObject         *object,
     case PROP_FULLSCREEN:
       g_value_set_boolean (value, win->fullscreen);
       break;
+    case PROP_MODAL:
+      g_value_set_boolean (value, (win->type == META_WINDOW_MODAL_DIALOG));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -259,7 +264,7 @@ meta_window_class_init (MetaWindowClass *klass)
                                    PROP_DECORATED,
                                    g_param_spec_boolean ("decorated",
                                                          "Decorated",
-                                                         "Whether windos is decorated",
+                                                         "Whether window is decorated",
                                                          TRUE,
                                                          G_PARAM_READABLE));
 
@@ -267,9 +272,18 @@ meta_window_class_init (MetaWindowClass *klass)
                                    PROP_FULLSCREEN,
                                    g_param_spec_boolean ("fullscreen",
                                                          "Fullscreen",
-                                                         "Whether windos is fullscreened",
+                                                         "Whether window is fullscreened",
                                                          FALSE,
                                                          G_PARAM_READABLE));
+
+  g_object_class_install_property (object_class,
+                                   PROP_MODAL,
+                                   g_param_spec_boolean ("modal",
+                                                         "Modal",
+                                                         "Whether window is modal",
+                                                         FALSE,
+                                                         G_PARAM_READABLE));
+
 
   window_signals[WORKSPACE_CHANGED] =
     g_signal_new ("workspace-changed",
