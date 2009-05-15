@@ -31,8 +31,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define NOT_TOO_SMALL_BORDER 15    /* space around the resized window */
-#define NOT_TOO_SMALL_TRIGGER 0.75 /* percentage of screen size below which
+#define NOT_TOO_SMALL_BORDER 20    /* space around the resized window */
+#define NOT_TOO_SMALL_TRIGGER 0.60 /* percentage of screen size below which
                                     * the NOT_TOO_SMALL constraint triggers
                                     */
 
@@ -1397,34 +1397,25 @@ constrain_not_too_small (MetaWindow         *window,
   MetaRectangle *start_rect;
   MetaRectangle min_size, max_size;
 
-  if (priority > PRIORITY_NOT_TOO_SMALL)
-    return TRUE;
-
-  /* Exit early if we know the constraint won't apply--note that this constraint
-   * is only meant for normal windows.
-   */
-  if (window->type != META_WINDOW_NORMAL)
+  if (priority > PRIORITY_NOT_TOO_SMALL || /* None of our businesss */
+      info->is_user_action ||              /* Don't mess users about */
+      window->type != META_WINDOW_NORMAL)  /* App windows only */
     return TRUE;
 
   if (window->frame)
     {
       width  = info->current.width  +
         info->fgeom->left_width + info->fgeom->right_width;
-
-      height = info->current.height +
-        info->fgeom->bottom_height + info->fgeom->top_height;
     }
   else
     {
       width  = info->current.width;
-      height = info->current.height;
     }
 
   screen_width  = info->work_area_xinerama.width;
   screen_height = info->work_area_xinerama.height;
 
-  if ((((gfloat)width / (gfloat) screen_width) < NOT_TOO_SMALL_TRIGGER) ||
-      (((gfloat)height / (gfloat) screen_height) < NOT_TOO_SMALL_TRIGGER))
+  if ((((gfloat)width / (gfloat) screen_width) < NOT_TOO_SMALL_TRIGGER))
     {
       already_satisfied = FALSE;
     }
@@ -1449,14 +1440,12 @@ constrain_not_too_small (MetaWindow         *window,
   else
     start_rect = &info->orig;
 
-  meta_rectangle_resize_with_gravity (start_rect,
-                                      &info->current,
-                                      info->resize_gravity,
-                                      width,
-                                      height);
-
   start_rect->x = NOT_TOO_SMALL_BORDER;
   start_rect->y = NOT_TOO_SMALL_BORDER;
+  start_rect->width  = width;
+  start_rect->height = height;
+
+  unextend_by_frame (start_rect, info->fgeom);
 
   return TRUE;
 }
