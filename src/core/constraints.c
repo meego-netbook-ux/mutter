@@ -1393,7 +1393,9 @@ constrain_not_too_small (MetaWindow         *window,
                          gboolean            check_only)
 {
   gboolean already_satisfied = TRUE;
+  gboolean resize = FALSE;
   gint screen_width, screen_height, width, height;
+  gint x = 0, y = 0, old_x = 0, old_y;
   MetaRectangle *start_rect;
   MetaRectangle min_size, max_size;
 
@@ -1402,27 +1404,43 @@ constrain_not_too_small (MetaWindow         *window,
       window->type != META_WINDOW_NORMAL)  /* App windows only */
     return TRUE;
 
-  if (window->frame)
-    {
+  old_x = info->current.x - info->fgeom->left_width;
+  old_y = info->current.y - info->fgeom->top_height;
+
       width  = info->current.width  +
         info->fgeom->left_width + info->fgeom->right_width;
-    }
-  else
-    {
-      width  = info->current.width;
-    }
+  height = info->current.height +
+    info->fgeom->top_height + info->fgeom->bottom_height;
 
   screen_width  = info->work_area_xinerama.width;
   screen_height = info->work_area_xinerama.height;
 
-  if ((((gfloat)width / (gfloat) screen_width) < NOT_TOO_SMALL_TRIGGER))
+  if ((((gfloat)width / (gfloat) screen_width) > NOT_TOO_SMALL_TRIGGER))
     {
       already_satisfied = FALSE;
+      resize = TRUE;
+
+      x = NOT_TOO_SMALL_BORDER;
+      y = NOT_TOO_SMALL_BORDER;
+    }
+
+  if (!resize)
+    {
+      /*
+       * If we are not resizing the application, attempt to center it.
+       */
+      x = (screen_width  - info->current.width) / 2 - info->fgeom->left_width;
+      y = (screen_height - info->current.height) / 2 - info->fgeom->top_height;
+
+      if (x != old_x || y != old_y)
+        already_satisfied = FALSE;
     }
 
   if (check_only || already_satisfied)
     return already_satisfied;
 
+  if (resize)
+    {
   width = screen_width - 2 * NOT_TOO_SMALL_BORDER;
   height = screen_height - 2 * NOT_TOO_SMALL_BORDER;
 
@@ -1434,14 +1452,15 @@ constrain_not_too_small (MetaWindow         *window,
 
   if (height > max_size.height)
     height = max_size.height;
+    }
 
   if (info->action_type == ACTION_MOVE_AND_RESIZE)
     start_rect = &info->current;
   else
     start_rect = &info->orig;
 
-  start_rect->x = NOT_TOO_SMALL_BORDER;
-  start_rect->y = NOT_TOO_SMALL_BORDER;
+  start_rect->x      = x;
+  start_rect->y      = y;
   start_rect->width  = width;
   start_rect->height = height;
 
