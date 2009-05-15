@@ -1415,6 +1415,9 @@ constrain_not_too_small (MetaWindow         *window,
   screen_width  = info->work_area_xinerama.width;
   screen_height = info->work_area_xinerama.height;
 
+  if (width == screen_width && height == screen_height)
+    return TRUE;
+
   if ((((gfloat)width / (gfloat) screen_width) > NOT_TOO_SMALL_TRIGGER))
     {
       already_satisfied = FALSE;
