@@ -1134,6 +1134,8 @@ mutter_window_effect_completed (MutterWindow *cw, gulong event)
         ClutterActor *cwa = CLUTTER_ACTOR (cw);
         ClutterActor *parent = clutter_actor_get_parent (cwa);
 
+        meta_window_set_compositor_private (cw->priv->window, NULL);
+
         if (CLUTTER_IS_CONTAINER (parent))
           clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
         else
@@ -1181,7 +1183,6 @@ destroy_win (MutterWindow *cw)
   priv = cw->priv;
 
   window = priv->window;
-  meta_window_set_compositor_private (window, NULL);
 
   /*
    * We remove the window from internal lookup hashes and thus any other
@@ -1204,6 +1205,8 @@ destroy_win (MutterWindow *cw)
        */
       ClutterActor *cwa = CLUTTER_ACTOR (cw);
       ClutterActor *parent = clutter_actor_get_parent (cwa);
+
+      meta_window_set_compositor_private (window, NULL);
 
       if (CLUTTER_IS_CONTAINER (parent))
         clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
@@ -1242,6 +1245,8 @@ destroy_win (MutterWindow *cw)
         {
           ClutterActor *cwa = CLUTTER_ACTOR (cw);
           ClutterActor *parent = clutter_actor_get_parent (cwa);
+
+          meta_window_set_compositor_private (window, NULL);
 
           if (CLUTTER_IS_CONTAINER (parent))
             clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
