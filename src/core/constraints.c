@@ -31,6 +31,11 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define NOT_TOO_SMALL_BORDER 15    /* space around the resized window */
+#define NOT_TOO_SMALL_TRIGGER 0.75 /* percentage of screen size below which
+                                    * the NOT_TOO_SMALL constraint triggers
+                                    */
+
 #if 0
  // This is the short and sweet version of how to hack on this file; see
  // doc/how-constraints-works.txt for the gory details.  The basics of
@@ -101,7 +106,8 @@ typedef enum
   PRIORITY_SIZE_HINTS_LIMITS = 3,
   PRIORITY_TITLEBAR_VISIBLE = 4,
   PRIORITY_PARTIALLY_VISIBLE_ON_WORKAREA = 4,
-  PRIORITY_MAXIMUM = 4 /* Dummy value used for loop end = max(all priorities) */
+  PRIORITY_NOT_TOO_SMALL = 5,
+  PRIORITY_MAXIMUM = 5 /* Dummy value used for loop end = max(all priorities) */
 } ConstraintPriority;
 
 typedef enum
@@ -177,6 +183,11 @@ static gboolean constrain_partially_onscreen (MetaWindow         *window,
                                               ConstraintPriority  priority,
                                               gboolean            check_only);
 
+static gboolean constrain_not_too_small      (MetaWindow         *window,
+                                              ConstraintInfo     *info,
+                                              ConstraintPriority  priority,
+                                              gboolean            check_only);
+
 static void setup_constraint_info        (ConstraintInfo      *info,
                                           MetaWindow          *window,
                                           MetaFrameGeometry   *orig_fgeom,
@@ -218,6 +229,8 @@ static const Constraint all_constraints[] = {
   {constrain_fully_onscreen,     "constrain_fully_onscreen"},
   {constrain_titlebar_visible,   "constrain_titlebar_visible"},
   {constrain_partially_onscreen, "constrain_partially_onscreen"},
+  {constrain_not_too_small,      "constrain_not_too_small"},
+
   {NULL,                         NULL}
 };
 
@@ -1371,4 +1384,79 @@ constrain_partially_onscreen (MetaWindow         *window,
                                               vert_amount_onscreen);
 
   return retval;
+}
+
+static gboolean
+constrain_not_too_small (MetaWindow         *window,
+                         ConstraintInfo     *info,
+                         ConstraintPriority  priority,
+                         gboolean            check_only)
+{
+  gboolean already_satisfied = TRUE;
+  gint screen_width, screen_height, width, height;
+  MetaRectangle *start_rect;
+  MetaRectangle min_size, max_size;
+
+  if (priority > PRIORITY_NOT_TOO_SMALL)
+    return TRUE;
+
+  /* Exit early if we know the constraint won't apply--note that this constraint
+   * is only meant for normal windows.
+   */
+  if (window->type != META_WINDOW_NORMAL)
+    return TRUE;
+
+  if (window->frame)
+    {
+      width  = info->current.width  +
+        info->fgeom->left_width + info->fgeom->right_width;
+
+      height = info->current.height +
+        info->fgeom->bottom_height + info->fgeom->top_height;
+    }
+  else
+    {
+      width  = info->current.width;
+      height = info->current.height;
+    }
+
+  screen_width  = info->work_area_xinerama.width;
+  screen_height = info->work_area_xinerama.height;
+
+  if ((((gfloat)width / (gfloat) screen_width) < NOT_TOO_SMALL_TRIGGER) ||
+      (((gfloat)height / (gfloat) screen_height) < NOT_TOO_SMALL_TRIGGER))
+    {
+      already_satisfied = FALSE;
+    }
+
+  if (check_only || already_satisfied)
+    return already_satisfied;
+
+  width = screen_width - 2 * NOT_TOO_SMALL_BORDER;
+  height = screen_height - 2 * NOT_TOO_SMALL_BORDER;
+
+  /* We respect the max size hints */
+  get_size_limits (window, info->fgeom, FALSE, &min_size, &max_size);
+
+  if (width > max_size.width)
+    width = max_size.width;
+
+  if (height > max_size.height)
+    height = max_size.height;
+
+  if (info->action_type == ACTION_MOVE_AND_RESIZE)
+    start_rect = &info->current;
+  else
+    start_rect = &info->orig;
+
+  meta_rectangle_resize_with_gravity (start_rect,
+                                      &info->current,
+                                      info->resize_gravity,
+                                      width,
+                                      height);
+
+  start_rect->x = NOT_TOO_SMALL_BORDER;
+  start_rect->y = NOT_TOO_SMALL_BORDER;
+
+  return TRUE;
 }
