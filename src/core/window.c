@@ -3546,9 +3546,24 @@ window_activate (MetaWindow     *window,
   if (window->xtransient_for == None &&
       !meta_window_located_on_workspace (window, workspace))
     {
-      meta_window_set_demands_attention (window);
-      /* We've marked it as demanding, don't need to do anything else. */
-      return;
+      /* Moblin Netbook modificatition - due to dependance on zones we
+       * need to loosen app ability to switch workspaces. In the future
+       * something a little safer and specific probably better..
+       */
+      if (!window->on_all_workspaces)
+        {
+          GList *tmp;
+
+          tmp = meta_window_get_workspaces (window);
+
+          if (tmp)
+            meta_workspace_activate_with_focus ((MetaWorkspace*)tmp->data,
+                                                window,
+                                                timestamp);
+
+          /* meta_window_set_demands_attention (window); */
+          return;
+        }
     }
   else if (window->xtransient_for != None)
     {
