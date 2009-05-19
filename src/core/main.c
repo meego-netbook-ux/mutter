@@ -78,6 +78,8 @@
 #include "compositor/mutter/mutter-plugin-manager.h"
 #endif
 
+#include <X11/cursorfont.h>
+
 /**
  * The exit code we'll return to our parent process when we eventually die.
  */
@@ -609,6 +611,23 @@ main (int argc, char **argv)
    * Clutter can only be initialized after the UI.
    */
   meta_clutter_init (ctx, &argc, &argv);
+
+  {
+    /*
+     * Set busy cursor as soon as we can (at this there is no MetaDisplay or
+     * MetaScreen object, so we have to do this the xlib way.
+     *
+     * Metacity will reset the cursor as soon as it creates the default
+     * MetaScreen object. Plugins might want to further control the cursor
+     * in their constructor.
+     */
+    Display *xdpy = meta_ui_get_display ();
+    Cursor   xc   = XCreateFontCursor (xdpy, XC_watch);
+
+    XDefineCursor (xdpy, RootWindow (xdpy, 0), xc);
+    XSync (xdpy,False);
+    XFreeCursor (xdpy, xc);
+  }
 #endif
 
   g_option_context_free (ctx);
