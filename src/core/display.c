@@ -1620,7 +1620,7 @@ event_callback (XEvent   *event,
     case ButtonPress:
       if (event->xbutton.button == 4 || event->xbutton.button == 5)
         {
-          if (display->compositor && window)
+          if (display->compositor)
             {
               return meta_compositor_process_event (display->compositor,
                                                     event,
