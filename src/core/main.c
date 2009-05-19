@@ -77,6 +77,12 @@
 #include "compositor/mutter-plugin-manager.h"
 #endif
 
+#include <X11/cursorfont.h>
+
+#ifdef HAVE_XCURSOR
+#include <X11/Xcursor/Xcursor.h>
+#endif
+
 /**
  * The exit code we'll return to our parent process when we eventually die.
  */
@@ -623,6 +629,36 @@ main (int argc, char **argv)
    */
   meta_clutter_init (ctx, &argc, &argv);
 
+  {
+    /*
+     * Set busy cursor as soon as we can (at this there is no MetaDisplay or
+     * MetaScreen object, so we have to do this the xlib way.
+     *
+     * Metacity will reset the cursor as soon as it creates the default
+     * MetaScreen object. Plugins might want to further control the cursor
+     * in their constructor.
+     */
+    Display *xdpy = meta_ui_get_display ();
+    Cursor   xc;
+
+#ifdef HAVE_XCURSOR
+    /*
+     * Obviously, this is moblin specific; we want the correct theme
+     * applied from the start, and we cannot query the prefs yet, but the
+     * prefs take a significant amount of time to query, and we do not want
+     * the uggly X watch cursor there at all.
+     */
+    XcursorSetTheme (xdpy, "moblin");
+    XcursorSetDefaultSize (xdpy, 24);
+#endif
+
+    xc = XCreateFontCursor (xdpy, XC_watch);
+
+    XDefineCursor (xdpy, RootWindow (xdpy, 0), xc);
+    XSync (xdpy,False);
+    XFreeCursor (xdpy, xc);
+  }
+
   g_option_context_free (ctx);
 
   /* must be after UI init so we can override GDK handlers */
@@ -630,6 +666,7 @@ main (int argc, char **argv)
 
   /* Load prefs */
   meta_prefs_init ();
+
   meta_prefs_add_listener (prefs_changed_callback, NULL);
 
 
@@ -720,7 +757,17 @@ main (int argc, char **argv)
 
   if (!meta_display_open ())
     meta_exit (META_EXIT_ERROR);
-  
+
+  /*
+   * This seems the first time we can set up the cursor properly. The display
+   * seems to set up the theme at the point it opens, but the cursor size
+   * for individual screens seems wrong unless we update it here.
+   *
+   * TODO -- investigate further to avoid unnecessary X round trips.
+   */
+  meta_display_set_cursor_theme (meta_prefs_get_cursor_theme (),
+                                 meta_prefs_get_cursor_size ());
+
   g_main_loop_run (meta_main_loop);
 
   meta_finalize ();

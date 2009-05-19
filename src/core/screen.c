@@ -724,7 +724,7 @@ meta_screen_new (MetaDisplay *display,
   
   reload_xinerama_infos (screen);
   
-  meta_screen_set_cursor (screen, META_CURSOR_DEFAULT);
+  meta_screen_set_cursor (screen, META_CURSOR_BUSY);
 
   /* Handle creating a no_focus_window for this screen */  
   screen->no_focus_window =
