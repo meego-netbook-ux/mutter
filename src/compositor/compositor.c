@@ -580,6 +580,8 @@ meta_compositor_manage_screen (MetaCompositor *compositor,
 
   clutter_actor_show (info->overlay_group);
   clutter_actor_show (info->stage);
+
+  meta_screen_set_cursor (screen, META_CURSOR_DEFAULT);
 }
 
 void
