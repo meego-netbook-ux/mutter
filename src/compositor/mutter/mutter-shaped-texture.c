@@ -280,32 +280,21 @@ mutter_shaped_texture_paint (ClutterActor *actor)
 
   if (priv->material == COGL_INVALID_HANDLE)
     {
+      GError *error = NULL;
+
       priv->material = cogl_material_new ();
 
-      /* Replace the RGB from layer 1 with the RGB from layer 0 */
-      cogl_material_set_layer_combine_function
-        (priv->material, 1,
-         COGL_MATERIAL_LAYER_COMBINE_CHANNELS_RGB,
-         COGL_MATERIAL_LAYER_COMBINE_FUNC_REPLACE);
-      cogl_material_set_layer_combine_arg_src
-        (priv->material, 1, 0,
-         COGL_MATERIAL_LAYER_COMBINE_CHANNELS_RGB,
-         COGL_MATERIAL_LAYER_COMBINE_SRC_PREVIOUS);
-
-      /* Modulate the alpha in layer 1 with the alpha from the
-         previous layer */
-      cogl_material_set_layer_combine_function
-        (priv->material, 1,
-         COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-         COGL_MATERIAL_LAYER_COMBINE_FUNC_MODULATE);
-      cogl_material_set_layer_combine_arg_src
-        (priv->material, 1, 0,
-         COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-         COGL_MATERIAL_LAYER_COMBINE_SRC_PREVIOUS);
-      cogl_material_set_layer_combine_arg_src
-        (priv->material, 1, 1,
-         COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-         COGL_MATERIAL_LAYER_COMBINE_SRC_TEXTURE);
+      /* Replace the RGB from layer 1 with the RGB from layer 0 and
+         modulate the alpha in layer 1 with the alpha from the
+         layer 0 */
+      if (!cogl_material_set_layer_combine (priv->material, 1,
+                                            "RGB = REPLACE (PREVIOUS)\n"
+                                            "A = MODULATE (PREVIOUS, TEXTURE)",
+                                            &error))
+        {
+          g_warning ("%s", error->message);
+          g_clear_error (&error);
+        }
     }
   material = priv->material;
 
