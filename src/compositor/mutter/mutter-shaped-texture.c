@@ -57,7 +57,7 @@ struct _MutterShapedTexturePrivate
 {
   CoglHandle mask_texture;
   CoglHandle material;
-#if 1 /* see workaround comment in mutter_shaped_texture_paint */
+#if 0 /* see workaround comment in mutter_shaped_texture_paint */
   CoglHandle material_workaround;
 #endif
 
@@ -106,7 +106,7 @@ mutter_shaped_texture_dispose (GObject *object)
       cogl_material_unref (priv->material);
       priv->material = COGL_INVALID_HANDLE;
     }
-#if 1 /* see comment in mutter_shaped_texture_paint */
+#if 0 /* see comment in mutter_shaped_texture_paint */
   if (priv->material_workaround != COGL_INVALID_HANDLE)
     {
       cogl_material_unref (priv->material_workaround);
@@ -249,7 +249,7 @@ mutter_shaped_texture_paint (ClutterActor *actor)
   guint tex_width, tex_height;
   ClutterActorBox alloc;
   CoglHandle material;
-#if 1 /* please see comment below about workaround */
+#if 0 /* please see comment below about workaround */
   guint depth;
 #endif
 
@@ -298,7 +298,7 @@ mutter_shaped_texture_paint (ClutterActor *actor)
     }
   material = priv->material;
 
-#if 1
+#if 0
   /* This was added as a workaround. It seems that with the intel
    * drivers when multi-texturing using an RGB TFP texture, the
    * texture is actually setup internally as an RGBA texture, where
