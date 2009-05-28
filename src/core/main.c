@@ -80,6 +80,10 @@
 
 #include <X11/cursorfont.h>
 
+#ifdef HAVE_XCURSOR
+#include <X11/Xcursor/Xcursor.h>
+#endif
+
 /**
  * The exit code we'll return to our parent process when we eventually die.
  */
@@ -622,7 +626,20 @@ main (int argc, char **argv)
      * in their constructor.
      */
     Display *xdpy = meta_ui_get_display ();
-    Cursor   xc   = XCreateFontCursor (xdpy, XC_watch);
+    Cursor   xc;
+
+#ifdef HAVE_XCURSOR
+    /*
+     * Obviously, this is moblin specific; we want the correct theme
+     * applied from the start, and we cannot query the prefs yet, but the
+     * prefs take a significant amount of time to query, and we do not want
+     * the uggly X watch cursor there at all.
+     */
+    XcursorSetTheme (xdpy, "moblin");
+    XcursorSetDefaultSize (xdpy, 24);
+#endif
+
+    xc = XCreateFontCursor (xdpy, XC_watch);
 
     XDefineCursor (xdpy, RootWindow (xdpy, 0), xc);
     XSync (xdpy,False);
@@ -637,6 +654,7 @@ main (int argc, char **argv)
 
   /* Load prefs */
   meta_prefs_init ();
+
   meta_prefs_add_listener (prefs_changed_callback, NULL);
 
 
@@ -727,7 +745,17 @@ main (int argc, char **argv)
 
   if (!meta_display_open ())
     meta_exit (META_EXIT_ERROR);
-  
+
+  /*
+   * This seems the first time we can set up the cursor properly. The display
+   * seems to set up the theme at the point it opens, but the cursor size
+   * for individual screens seems wrong unless we update it here.
+   *
+   * TODO -- investigate further to avoid unnecessary X round trips.
+   */
+  meta_display_set_cursor_theme (meta_prefs_get_cursor_theme (),
+                                 meta_prefs_get_cursor_size ());
+
   g_main_loop_run (meta_main_loop);
 
   meta_finalize ();
