@@ -227,7 +227,7 @@ mutter_shaped_texture_ensure_mask (MutterShapedTexture *stex)
         }
       else
         priv->mask_texture = cogl_texture_new_from_data (tex_width, tex_height,
-                                                         -1, FALSE,
+                                                         COGL_TEXTURE_NO_SLICING,
                                                          COGL_PIXEL_FORMAT_A_8,
                                                          COGL_PIXEL_FORMAT_ANY,
                                                          tex_width,
