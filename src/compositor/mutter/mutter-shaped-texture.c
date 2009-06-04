@@ -57,7 +57,7 @@ struct _MutterShapedTexturePrivate
 {
   CoglHandle mask_texture;
   CoglHandle material;
-#if 0 /* see workaround comment in mutter_shaped_texture_paint */
+#if 1 /* see workaround comment in mutter_shaped_texture_paint */
   CoglHandle material_workaround;
 #endif
 
@@ -106,7 +106,7 @@ mutter_shaped_texture_dispose (GObject *object)
       cogl_material_unref (priv->material);
       priv->material = COGL_INVALID_HANDLE;
     }
-#if 0 /* see comment in mutter_shaped_texture_paint */
+#if 1 /* see comment in mutter_shaped_texture_paint */
   if (priv->material_workaround != COGL_INVALID_HANDLE)
     {
       cogl_material_unref (priv->material_workaround);
@@ -249,7 +249,7 @@ mutter_shaped_texture_paint (ClutterActor *actor)
   guint tex_width, tex_height;
   ClutterActorBox alloc;
   CoglHandle material;
-#if 0 /* please see comment below about workaround */
+#if 1 /* please see comment below about workaround */
   guint depth;
 #endif
 
@@ -298,7 +298,7 @@ mutter_shaped_texture_paint (ClutterActor *actor)
     }
   material = priv->material;
 
-#if 0
+#if 1
   /* This was added as a workaround. It seems that with the intel
    * drivers when multi-texturing using an RGB TFP texture, the
    * texture is actually setup internally as an RGBA texture, where
@@ -312,32 +312,23 @@ mutter_shaped_texture_paint (ClutterActor *actor)
     {
       if (priv->material_workaround == COGL_INVALID_HANDLE)
         {
+          static const char combine_string[] =
+            /* Replace the RGB from layer 1 with the RGB from layer 0 */
+            "RGB = REPLACE (PREVIOUS)\n"
+            /* Use the alpha from layer 1 modulated with the alpha from
+               the primary color */
+            "A = MODULATE (PRIMARY, TEXTURE)";
+          GError *error = NULL;
+
           material = priv->material_workaround = cogl_material_new ();
 
-          /* Replace the RGB from layer 1 with the RGB from layer 0 */
-          cogl_material_set_layer_combine_function
-            (material, 1,
-             COGL_MATERIAL_LAYER_COMBINE_CHANNELS_RGB,
-             COGL_MATERIAL_LAYER_COMBINE_FUNC_REPLACE);
-          cogl_material_set_layer_combine_arg_src
-            (material, 1, 0,
-             COGL_MATERIAL_LAYER_COMBINE_CHANNELS_RGB,
-             COGL_MATERIAL_LAYER_COMBINE_SRC_PREVIOUS);
-
-          /* Use the alpha from layer 1 modulated with the alpha from
-             the primary color */
-          cogl_material_set_layer_combine_function
-            (material, 1,
-             COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-             COGL_MATERIAL_LAYER_COMBINE_FUNC_MODULATE);
-          cogl_material_set_layer_combine_arg_src
-            (material, 1, 0,
-             COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-             COGL_MATERIAL_LAYER_COMBINE_SRC_PRIMARY_COLOR);
-          cogl_material_set_layer_combine_arg_src
-            (material, 1, 1,
-             COGL_MATERIAL_LAYER_COMBINE_CHANNELS_ALPHA,
-             COGL_MATERIAL_LAYER_COMBINE_SRC_TEXTURE);
+          if (!cogl_material_set_layer_combine (material, 1,
+                                                combine_string,
+                                                &error))
+            {
+              g_warning ("%s", error->message);
+              g_clear_error (&error);
+            }
         }
 
       material = priv->material_workaround;
