@@ -68,9 +68,9 @@ struct _TidyTextureFramePrivate
 
 static void
 tidy_texture_frame_get_preferred_width (ClutterActor *self,
-                                        ClutterUnit   for_height,
-                                        ClutterUnit  *min_width_p,
-                                        ClutterUnit  *natural_width_p)
+                                        float         for_height,
+                                        float        *min_width_p,
+                                        float        *natural_width_p)
 {
   TidyTextureFramePrivate *priv = TIDY_TEXTURE_FRAME (self)->priv;
 
@@ -101,9 +101,9 @@ tidy_texture_frame_get_preferred_width (ClutterActor *self,
 
 static void
 tidy_texture_frame_get_preferred_height (ClutterActor *self,
-                                         ClutterUnit   for_width,
-                                         ClutterUnit  *min_height_p,
-                                         ClutterUnit  *natural_height_p)
+                                         float         for_width,
+                                         float        *min_height_p,
+                                         float        *natural_height_p)
 {
   TidyTextureFramePrivate *priv = TIDY_TEXTURE_FRAME (self)->priv;
 
