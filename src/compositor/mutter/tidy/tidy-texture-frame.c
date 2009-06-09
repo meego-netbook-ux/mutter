@@ -68,9 +68,9 @@ struct _TidyTextureFramePrivate
 
 static void
 tidy_texture_frame_get_preferred_width (ClutterActor *self,
-                                        float         for_height,
-                                        float        *min_width_p,
-                                        float        *natural_width_p)
+                                        gfloat        for_height,
+                                        gfloat       *min_width_p,
+                                        gfloat       *natural_width_p)
 {
   TidyTextureFramePrivate *priv = TIDY_TEXTURE_FRAME (self)->priv;
 
@@ -101,9 +101,9 @@ tidy_texture_frame_get_preferred_width (ClutterActor *self,
 
 static void
 tidy_texture_frame_get_preferred_height (ClutterActor *self,
-                                         float         for_width,
-                                         float        *min_height_p,
-                                         float        *natural_height_p)
+                                         gfloat        for_width,
+                                         gfloat       *min_height_p,
+                                         gfloat       *natural_height_p)
 {
   TidyTextureFramePrivate *priv = TIDY_TEXTURE_FRAME (self)->priv;
 
@@ -243,7 +243,7 @@ tidy_texture_frame_paint (ClutterActor *self)
   cogl_rectangle_with_texture_coords (ex, priv->top, width, ey,
                                       tx2, ty1,
                                       1.0, ty2);
-  
+
   /* bottom left */
   cogl_rectangle_with_texture_coords (0, ey, priv->left, height,
                                       0.0, ty2,
@@ -507,7 +507,7 @@ tidy_texture_frame_init (TidyTextureFrame *self)
  * Return value: the newly created #TidyTextureFrame
  */
 ClutterActor*
-tidy_texture_frame_new (ClutterTexture *texture, 
+tidy_texture_frame_new (ClutterTexture *texture,
 			gfloat          left,
 			gfloat          top,
 			gfloat          right,

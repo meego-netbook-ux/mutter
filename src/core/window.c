@@ -615,7 +615,6 @@ meta_window_new_with_attrs (MetaDisplay       *display,
   window->constructing = TRUE;
 
   window->dialog_pid = -1;
-  window->dialog_pipe = -1;
 
   window->xwindow = xwindow;
 
@@ -8719,6 +8718,21 @@ meta_window_get_description (MetaWindow *window)
     return NULL;
 
   return window->desc;
+}
+
+/**
+ * meta_window_get_wm_class:
+ * @window: a #MetaWindow
+ * 
+ * Return the current value of the WM_CLASS X property.
+ */
+const char *
+meta_window_get_wm_class (MetaWindow *window)
+{
+  if (!window)
+    return NULL;
+
+  return window->res_class;
 }
 
 /**
