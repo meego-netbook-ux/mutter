@@ -280,21 +280,11 @@ mutter_shaped_texture_paint (ClutterActor *actor)
 
   if (priv->material == COGL_INVALID_HANDLE)
     {
-      GError *error = NULL;
-
       priv->material = cogl_material_new ();
 
-      /* Replace the RGB from layer 1 with the RGB from layer 0 and
-         modulate the alpha in layer 1 with the alpha from the
-         layer 0 */
-      if (!cogl_material_set_layer_combine (priv->material, 1,
-                                            "RGB = REPLACE (PREVIOUS)\n"
-                                            "A = MODULATE (PREVIOUS, TEXTURE)",
-                                            &error))
-        {
-          g_warning ("%s", error->message);
-          g_clear_error (&error);
-        }
+      cogl_material_set_layer_combine (priv->material, 1,
+				       "RGBA = MODULATE (PREVIOUS, TEXTURE[A])",
+				       NULL);
     }
   material = priv->material;
 
@@ -312,23 +302,15 @@ mutter_shaped_texture_paint (ClutterActor *actor)
     {
       if (priv->material_workaround == COGL_INVALID_HANDLE)
         {
-          static const char combine_string[] =
-            /* Replace the RGB from layer 1 with the RGB from layer 0 */
-            "RGB = REPLACE (PREVIOUS)\n"
-            /* Use the alpha from layer 1 modulated with the alpha from
-               the primary color */
-            "A = MODULATE (PRIMARY, TEXTURE)";
-          GError *error = NULL;
-
           material = priv->material_workaround = cogl_material_new ();
 
-          if (!cogl_material_set_layer_combine (material, 1,
-                                                combine_string,
-                                                &error))
-            {
-              g_warning ("%s", error->message);
-              g_clear_error (&error);
-            }
+	  cogl_material_set_layer_combine (material, 0,
+					   "RGB = MODULATE (TEXTURE, PREVIOUS)"
+					   "A = REPLACE (PREVIOUS)",
+					   NULL);
+	  cogl_material_set_layer_combine (material, 1,
+					   "RGBA = MODULATE (PREVIOUS, TEXTURE[A])",
+					   NULL);
         }
 
       material = priv->material_workaround;
@@ -340,8 +322,8 @@ mutter_shaped_texture_paint (ClutterActor *actor)
 
   {
     CoglColor color;
-    cogl_color_set_from_4ub (&color, 255, 255, 255,
-                             clutter_actor_get_paint_opacity (actor));
+    guchar opacity = clutter_actor_get_paint_opacity (actor);
+    cogl_color_set_from_4ub (&color, opacity, opacity, opacity, opacity);
     cogl_material_set_color (material, &color);
   }
 
