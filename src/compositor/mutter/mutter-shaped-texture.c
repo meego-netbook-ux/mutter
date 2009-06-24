@@ -280,8 +280,6 @@ mutter_shaped_texture_paint (ClutterActor *actor)
 
   if (priv->material == COGL_INVALID_HANDLE)
     {
-      GError *error = NULL;
-
       priv->material = cogl_material_new ();
 
       cogl_material_set_layer_combine (priv->material, 1,
@@ -304,14 +302,6 @@ mutter_shaped_texture_paint (ClutterActor *actor)
     {
       if (priv->material_workaround == COGL_INVALID_HANDLE)
         {
-          static const char combine_string[] =
-            /* Replace the RGB from layer 1 with the RGB from layer 0 */
-            "RGB = REPLACE (PREVIOUS)\n"
-            /* Use the alpha from layer 1 modulated with the alpha from
-               the primary color */
-            "A = MODULATE (PRIMARY, TEXTURE)";
-          GError *error = NULL;
-
           material = priv->material_workaround = cogl_material_new ();
 
 	  cogl_material_set_layer_combine (material, 0,
