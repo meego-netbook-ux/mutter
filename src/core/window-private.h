@@ -1,7 +1,7 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
 /**
- * \file window-private.h  Windows which Metacity manages
+ * \file window-private.h  Windows which Mutter manages
  *
  * Managing X windows.
  * This file contains methods on this class which are available to
@@ -400,8 +400,6 @@ void        meta_window_unmanage           (MetaWindow  *window,
 void        meta_window_calc_showing       (MetaWindow  *window);
 void        meta_window_queue              (MetaWindow  *window,
                                             guint queuebits);
-void        meta_window_minimize           (MetaWindow  *window);
-void        meta_window_unminimize         (MetaWindow  *window);
 void        meta_window_maximize_internal  (MetaWindow        *window,
                                             MetaMaximizeFlags  directions,
                                             MetaRectangle     *saved_rect);
@@ -494,8 +492,6 @@ void        meta_window_update_wireframe (MetaWindow *window,
                                           int         height);
 void        meta_window_end_wireframe (MetaWindow *window);
 
-void        meta_window_delete             (MetaWindow  *window,
-                                            guint32      timestamp);
 void        meta_window_kill               (MetaWindow  *window);
 void        meta_window_focus              (MetaWindow  *window,
                                             guint32      timestamp);

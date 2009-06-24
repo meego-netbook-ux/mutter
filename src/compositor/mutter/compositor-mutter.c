@@ -1,7 +1,6 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
 #define _GNU_SOURCE
-#define _XOPEN_SOURCE 500 /* for usleep() */
 
 #include <config.h>
 
@@ -1131,16 +1130,9 @@ mutter_window_effect_completed (MutterWindow *cw, gulong event)
 
     if (priv->needs_destroy && effect_in_progress (cw, TRUE) == FALSE)
       {
-        ClutterActor *cwa = CLUTTER_ACTOR (cw);
-        ClutterActor *parent = clutter_actor_get_parent (cwa);
-
         meta_window_set_compositor_private (cw->priv->window, NULL);
 
-        if (CLUTTER_IS_CONTAINER (parent))
-          clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
-        else
-          clutter_actor_unparent (cwa);
-
+	clutter_actor_destroy (CLUTTER_ACTOR (cw));
 	return;
       }
 
@@ -1203,16 +1195,9 @@ destroy_win (MutterWindow *cw)
       /*
        * No effects, just kill it.
        */
-      ClutterActor *cwa = CLUTTER_ACTOR (cw);
-      ClutterActor *parent = clutter_actor_get_parent (cwa);
-
       meta_window_set_compositor_private (window, NULL);
 
-      if (CLUTTER_IS_CONTAINER (parent))
-        clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
-      else
-        clutter_actor_unparent (cwa);
-
+      clutter_actor_destroy (CLUTTER_ACTOR (cw));
       return;
     }
 
@@ -1243,15 +1228,9 @@ destroy_win (MutterWindow *cw)
 	}
       else
         {
-          ClutterActor *cwa = CLUTTER_ACTOR (cw);
-          ClutterActor *parent = clutter_actor_get_parent (cwa);
-
           meta_window_set_compositor_private (window, NULL);
 
-          if (CLUTTER_IS_CONTAINER (parent))
-            clutter_container_remove_actor (CLUTTER_CONTAINER (parent), cwa);
-          else
-            clutter_actor_unparent (cwa);
+          clutter_actor_destroy (CLUTTER_ACTOR (cw));
         }
     }
 }
@@ -1742,21 +1721,6 @@ process_property_notify (Mutter		*compositor,
   DEBUG_TRACE ("process_property_notify: unknown\n");
 }
 
-static void
-show_overlay_window (Display *xdisplay, Window xstage, Window xoverlay)
-{
-  XserverRegion  region;
-
-  region = XFixesCreateRegion (xdisplay, NULL, 0);
-
-  XFixesSetWindowShapeRegion (xdisplay, xoverlay, ShapeBounding, 0, 0, 0);
-
-  XFixesSetWindowShapeRegion (xdisplay, xoverlay, ShapeInput, 0, 0, region);
-  XFixesSetWindowShapeRegion (xdisplay, xstage,   ShapeInput, 0, 0, region);
-
-  XFixesDestroyRegion (xdisplay, region);
-}
-
 static Window
 get_output_window (MetaScreen *screen)
 {
@@ -1832,6 +1796,19 @@ mutter_get_windows (MetaScreen *screen)
   return info->windows;
 }
 
+static void
+do_set_stage_input_region (MetaScreen *screen,
+                           XserverRegion region)
+{
+  MetaCompScreen *info = meta_screen_get_compositor_data (screen);
+  MetaDisplay *display = meta_screen_get_display (screen);
+  Display        *xdpy = meta_display_get_xdisplay (display);
+  Window        xstage = clutter_x11_get_stage_window (CLUTTER_STAGE (info->stage));
+
+  XFixesSetWindowShapeRegion (xdpy, xstage, ShapeInput, 0, 0, region);
+  XFixesSetWindowShapeRegion (xdpy, info->output, ShapeInput, 0, 0, region);
+}
+
 void
 mutter_set_stage_input_region (MetaScreen *screen,
                                XserverRegion region)
@@ -1842,15 +1819,22 @@ mutter_set_stage_input_region (MetaScreen *screen,
 
   if (info->stage && info->output)
     {
-      Window xstage = clutter_x11_get_stage_window (CLUTTER_STAGE (info->stage));
-
-      XFixesSetWindowShapeRegion (xdpy, xstage, ShapeInput, 0, 0, region);
-      XFixesSetWindowShapeRegion (xdpy, info->output, ShapeInput, 0, 0, region);
+      do_set_stage_input_region (screen, region);
     }
-  else if (region != None)
+  else
     {
-      info->pending_input_region = XFixesCreateRegion (xdpy, NULL, 0);
-      XFixesCopyRegion (xdpy, info->pending_input_region, region);
+      /* Reset info->pending_input_region if one existed before and set the new
+       * one to use it later. */
+      if (info->pending_input_region)
+        {
+          XFixesDestroyRegion (xdpy, info->pending_input_region);
+          info->pending_input_region = None;
+        }
+      if (region != None)
+        {
+          info->pending_input_region = XFixesCreateRegion (xdpy, NULL, 0);
+          XFixesCopyRegion (xdpy, info->pending_input_region, region);
+        }
     }
 }
 
@@ -1902,6 +1886,14 @@ clutter_cmp_manage_screen (MetaCompositor *compositor,
     }
 
   info = g_new0 (MetaCompScreen, 1);
+  /*
+   * We use an empty input region for Clutter as a default because that allows
+   * the user to interact with all the windows displayed on the screen.
+   * We have to initialize info->pending_input_region to an empty region explicitly,
+   * because None value is used to mean that the whole screen is an input region.
+   */
+  info->pending_input_region = XFixesCreateRegion (xdisplay, NULL, 0);
+
   info->screen = screen;
 
   meta_screen_set_compositor_data (screen, info);
@@ -1966,11 +1958,19 @@ clutter_cmp_manage_screen (MetaCompositor *compositor,
   info->output = get_output_window (screen);
   XReparentWindow (xdisplay, xwin, info->output, 0, 0);
 
-  show_overlay_window (xdisplay, xwin, info->output);
+ /* Make sure there isn't any left-over output shape on the
+  * overlay window by setting the whole screen to be an
+  * output region.
+  *
+  * Note: there doesn't seem to be any real chance of that
+  *  because the X server will destroy the overlay window
+  *  when the last client using it exits.
+  */
+  XFixesSetWindowShapeRegion (xdisplay, info->output, ShapeBounding, 0, 0, None);
 
+  do_set_stage_input_region (screen, info->pending_input_region);
   if (info->pending_input_region != None)
     {
-      mutter_set_stage_input_region (screen, info->pending_input_region);
       XFixesDestroyRegion (xdisplay, info->pending_input_region);
       info->pending_input_region = None;
     }

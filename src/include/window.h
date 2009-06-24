@@ -59,7 +59,7 @@ typedef enum
 #define META_TYPE_WINDOW            (meta_window_get_type ())
 #define META_WINDOW(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), META_TYPE_WINDOW, MetaWindow))
 #define META_WINDOW_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass),  META_TYPE_WINDOW, MetaWindowClass))
-#define META_IS_WINDOW(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), META_WINDOW_TYPE))
+#define META_IS_WINDOW(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), META_TYPE_WINDOW))
 #define META_IS_WINDOW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass),  META_TYPE_WINDOW))
 #define META_WINDOW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj),  META_TYPE_WINDOW, MetaWindowClass))
 
@@ -106,5 +106,11 @@ void meta_window_maximize   (MetaWindow        *window,
                              MetaMaximizeFlags  directions);
 void meta_window_unmaximize (MetaWindow        *window,
                              MetaMaximizeFlags  directions);
+void        meta_window_minimize           (MetaWindow  *window);
+void        meta_window_unminimize         (MetaWindow  *window);
+const char *meta_window_get_title (MetaWindow *window);
+MetaWindow *meta_window_get_transient_for (MetaWindow *window);
+void        meta_window_delete             (MetaWindow  *window,
+                                            guint32      timestamp);
 
 #endif

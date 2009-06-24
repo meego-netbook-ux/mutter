@@ -1,6 +1,6 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
-/* Metacity X managed windows */
+/* Mutter X managed windows */
 
 /*
  * Copyright (C) 2001 Havoc Pennington, Anders Carlsson
@@ -1433,7 +1433,7 @@ set_wm_state (MetaWindow *window,
   meta_verbose ("Setting wm state %s on %s\n",
                 wm_state_to_string (state), window->desc);
 
-  /* Metacity doesn't use icon windows, so data[1] should be None
+  /* Mutter doesn't use icon windows, so data[1] should be None
    * according to the ICCCM 2.0 Section 4.1.3.1.
    */
   data[0] = state;
@@ -2001,9 +2001,9 @@ meta_window_queue (MetaWindow *window, guint queuebits)
 
           const gint window_queue_idle_priority[NUMBER_OF_QUEUES] =
             {
-              G_PRIORITY_DEFAULT_IDLE,  /* CALC_SHOWING */
-              META_PRIORITY_RESIZE,     /* MOVE_RESIZE */
-              G_PRIORITY_DEFAULT_IDLE   /* UPDATE_ICON */
+              META_PRIORITY_BEFORE_REDRAW, /* CALC_SHOWING */
+              META_PRIORITY_RESIZE,        /* MOVE_RESIZE */
+              META_PRIORITY_BEFORE_REDRAW  /* UPDATE_ICON */
             };
 
           const GSourceFunc window_queue_idle_handler[NUMBER_OF_QUEUES] =
@@ -2321,6 +2321,75 @@ window_would_be_covered (const MetaWindow *newbie)
   return FALSE; /* none found */
 }
 
+static gboolean
+map_frame (MetaWindow *window)
+{
+  if (window->frame && !window->frame->mapped)
+    {
+      meta_topic (META_DEBUG_WINDOW_STATE,
+                  "Frame actually needs map\n");
+      window->frame->mapped = TRUE;
+      meta_ui_map_frame (window->screen->ui, window->frame->xwindow);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+static gboolean
+unmap_frame (MetaWindow *window)
+{
+  if (window->frame && window->frame->mapped)
+    {
+      meta_topic (META_DEBUG_WINDOW_STATE, "Frame actually needs unmap\n");
+      window->frame->mapped = FALSE;
+      meta_ui_unmap_frame (window->screen->ui, window->frame->xwindow);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+static gboolean
+map_client_window (MetaWindow *window)
+{
+  if (!window->mapped)
+    {
+      meta_topic (META_DEBUG_WINDOW_STATE,
+                  "%s actually needs map\n", window->desc);
+      window->mapped = TRUE;
+      meta_error_trap_push (window->display);
+      XMapWindow (window->display->xdisplay, window->xwindow);
+      meta_error_trap_pop (window->display, FALSE);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
+static gboolean
+unmap_client_window (MetaWindow *window,
+                     const char *reason)
+{
+  if (window->mapped)
+    {
+      meta_topic (META_DEBUG_WINDOW_STATE,
+                  "%s actually needs unmap%s\n",
+                  window->desc, reason);
+      meta_topic (META_DEBUG_WINDOW_STATE,
+                  "Incrementing unmaps_pending on %s%s\n",
+                  window->desc, reason);
+      window->mapped = FALSE;
+      window->unmaps_pending += 1;
+      meta_error_trap_push (window->display);
+      XUnmapWindow (window->display->xdisplay, window->xwindow);
+      meta_error_trap_pop (window->display, FALSE);
+      return TRUE;
+    }
+  else
+    return FALSE;
+}
+
 /* XXX META_EFFECT_*_MAP */
 void
 meta_window_show (MetaWindow *window)
@@ -2470,30 +2539,12 @@ meta_window_show (MetaWindow *window)
 
   /* Shaded means the frame is mapped but the window is not */
 
-  if (window->frame && !window->frame->mapped)
-    {
-      meta_topic (META_DEBUG_WINDOW_STATE,
-                  "Frame actually needs map\n");
-      window->frame->mapped = TRUE;
-      meta_ui_map_frame (window->screen->ui, window->frame->xwindow);
-      did_show = TRUE;
-    }
+  if (map_frame (window))
+    did_show = TRUE;
 
   if (window->shaded)
     {
-      if (window->mapped)
-        {
-          meta_topic (META_DEBUG_WINDOW_STATE,
-                      "%s actually needs unmap (shaded)\n", window->desc);
-          meta_topic (META_DEBUG_WINDOW_STATE,
-                      "Incrementing unmaps_pending on %s for shade\n",
-                      window->desc);
-          window->mapped = FALSE;
-          window->unmaps_pending += 1;
-          meta_error_trap_push (window->display);
-          XUnmapWindow (window->display->xdisplay, window->xwindow);
-          meta_error_trap_pop (window->display, FALSE);
-        }
+      unmap_client_window (window, " (shading)");
 
       if (!window->iconic)
         {
@@ -2503,16 +2554,8 @@ meta_window_show (MetaWindow *window)
     }
   else
     {
-      if (!window->mapped)
-        {
-          meta_topic (META_DEBUG_WINDOW_STATE,
-                      "%s actually needs map\n", window->desc);
-          window->mapped = TRUE;
-          meta_error_trap_push (window->display);
-          XMapWindow (window->display->xdisplay, window->xwindow);
-          meta_error_trap_pop (window->display, FALSE);
-          did_show = TRUE;
-        }
+      if (map_client_window (window))
+        did_show = TRUE;
 
       if (meta_prefs_get_live_hidden_windows ())
         {
@@ -2621,20 +2664,11 @@ meta_window_hide (MetaWindow *window)
       if (window->hidden)
         return;
 
-      if (!window->mapped)
-	{
-	  Window top_level_window;
-	  meta_topic (META_DEBUG_WINDOW_STATE,
-                      "%s actually needs map\n", window->desc);
-          window->mapped = TRUE;
-          meta_error_trap_push (window->display);
-	  if (window->frame)
-	    top_level_window = window->frame->xwindow;
-	  else
-	    top_level_window = window->xwindow;
-	  XMapWindow (window->display->xdisplay, top_level_window);
-          meta_error_trap_pop (window->display, FALSE);
-	}
+      /* If this is the first time that we've calculating the showing
+       * state of the window, the frame and client window might not
+       * yet be mapped, so we need to map them now */
+      map_frame (window);
+      map_client_window (window);
 
       meta_stack_freeze (window->screen->stack);
       window->hidden = TRUE;
@@ -2655,28 +2689,13 @@ meta_window_hide (MetaWindow *window)
       meta_compositor_unmap_window (window->display->compositor,
 				    window);
 
-      if (window->frame && window->frame->mapped)
-        {
-          meta_topic (META_DEBUG_WINDOW_STATE, "Frame actually needs unmap\n");
-          window->frame->mapped = FALSE;
-          meta_ui_unmap_frame (window->screen->ui, window->frame->xwindow);
-          did_hide = TRUE;
-        }
-
-      if (window->mapped)
-        {
-          meta_topic (META_DEBUG_WINDOW_STATE,
-                      "%s actually needs unmap\n", window->desc);
-          meta_topic (META_DEBUG_WINDOW_STATE,
-                      "Incrementing unmaps_pending on %s for hide\n",
-                      window->desc);
-          window->mapped = FALSE;
-          window->unmaps_pending += 1;
-          meta_error_trap_push (window->display);
-          XUnmapWindow (window->display->xdisplay, window->xwindow);
-          meta_error_trap_pop (window->display, FALSE);
-          did_hide = TRUE;
-        }
+      /* Unmapping the frame is enough to make the window disappear,
+       * but we need to hide the window itself so the client knows
+       * it has been hidden */
+      if (unmap_frame (window))
+        did_hide = TRUE;
+      if (unmap_client_window (window, " (hiding)"))
+        did_hide = TRUE;
     }
 
   if (!window->iconic)
@@ -3361,7 +3380,7 @@ window_activate (MetaWindow     *window,
 }
 
 /* This function exists since most of the functionality in window_activate
- * is useful for Metacity, but Metacity shouldn't need to specify a client
+ * is useful for Mutter, but Mutter shouldn't need to specify a client
  * type for itself.  ;-)
  */
 void
@@ -3892,10 +3911,10 @@ meta_window_move_resize_internal (MetaWindow          *window,
     need_configure_notify = TRUE;
 
   /* MapRequest events with a PPosition or UPosition hint with a frame
-   * are moved by metacity without resizing; send a configure notify
+   * are moved by mutter without resizing; send a configure notify
    * in such cases.  See #322840.  (Note that window->constructing is
    * only true iff this call is due to a MapRequest, and when
-   * PPosition/UPosition hints aren't set, metacity seems to send a
+   * PPosition/UPosition hints aren't set, mutter seems to send a
    * ConfigureNotify anyway due to the above code.)
    */
   if (window->constructing && window->frame &&
@@ -5736,7 +5755,7 @@ meta_window_notify_focus (MetaWindow *window,
    *
    * My suggestion is to change it so that we clearly separate
    * actual keyboard focus tracking using the xterm algorithm,
-   * and metacity's "pretend" focus window, and go through all
+   * and mutter's "pretend" focus window, and go through all
    * the code and decide which one should be used in each place;
    * a hard bit is deciding on a policy for that.
    *
@@ -6610,8 +6629,8 @@ set_allowed_actions_hint (MetaWindow *window)
       data[i] = window->display->atom__NET_WM_ACTION_SHADE;
       ++i;
     }
-  /* sticky according to EWMH is different from metacity's sticky;
-   * metacity doesn't support EWMH sticky
+  /* sticky according to EWMH is different from mutter's sticky;
+   * mutter doesn't support EWMH sticky
    */
   if (window->has_maximize_func)
     {
@@ -8768,8 +8787,48 @@ meta_window_get_role (MetaWindow *window)
   return window->role;
 }
 
+/**
+ * meta_window_get_title:
+ * @window: a #MetaWindow
+ *
+ * Returns the current title of the window.
+ */
+const char *
+meta_window_get_title (MetaWindow *window)
+{
+  g_return_val_if_fail (META_IS_WINDOW (window), NULL);
+
+  return window->title;
+}
+
 MetaStackLayer
 meta_window_get_layer (MetaWindow *window)
 {
   return window->layer;
+}
+
+/**
+ * meta_window_get_transient_for:
+ * @window: a #MetaWindow
+ *
+ * Returns the #MetaWindow for the window that is pointed to by the
+ * WM_TRANSIENT_FOR hint on this window (see XGetTransientForHint()
+ * or XSetTransientForHint()). Metacity keeps transient windows above their
+ * parents. A typical usage of this hint is for a dialog that wants to stay
+ * above its associated window.
+ *
+ * Return value: (transfer none): the window this window is transient for, or
+ * %NULL if the WM_TRANSIENT_FOR hint is unset or does not point to a toplevel
+ * window that Metacity knows about.
+ */
+MetaWindow *
+meta_window_get_transient_for (MetaWindow *window)
+{
+  g_return_val_if_fail (META_IS_WINDOW (window), NULL);
+
+  if (window->xtransient_for)
+    return meta_display_lookup_x_window (window->display,
+                                         window->xtransient_for);
+  else
+    return NULL;
 }
