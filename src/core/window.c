@@ -4153,7 +4153,8 @@ idle_move_resize (gpointer data)
       window = tmp->data;
 
       /* As a side effect, sets window->move_resize_queued = FALSE */
-      meta_window_move_resize_now (window);
+      if (!window->override_redirect)
+        meta_window_move_resize_now (window);
 
       tmp = tmp->next;
     }
