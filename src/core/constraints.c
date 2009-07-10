@@ -31,6 +31,11 @@
 #include <stdlib.h>
 #include <math.h>
 
+#define NOT_TOO_SMALL_BORDER 20    /* space around the resized window */
+#define NOT_TOO_SMALL_TRIGGER 0.60 /* percentage of screen size below which
+                                    * the NOT_TOO_SMALL constraint triggers
+                                    */
+
 #if 0
  // This is the short and sweet version of how to hack on this file; see
  // doc/how-constraints-works.txt for the gory details.  The basics of
@@ -101,7 +106,8 @@ typedef enum
   PRIORITY_SIZE_HINTS_LIMITS = 3,
   PRIORITY_TITLEBAR_VISIBLE = 4,
   PRIORITY_PARTIALLY_VISIBLE_ON_WORKAREA = 4,
-  PRIORITY_MAXIMUM = 4 /* Dummy value used for loop end = max(all priorities) */
+  PRIORITY_NOT_TOO_SMALL = 5,
+  PRIORITY_MAXIMUM = 5 /* Dummy value used for loop end = max(all priorities) */
 } ConstraintPriority;
 
 typedef enum
@@ -177,6 +183,11 @@ static gboolean constrain_partially_onscreen (MetaWindow         *window,
                                               ConstraintPriority  priority,
                                               gboolean            check_only);
 
+static gboolean constrain_not_too_small      (MetaWindow         *window,
+                                              ConstraintInfo     *info,
+                                              ConstraintPriority  priority,
+                                              gboolean            check_only);
+
 static void setup_constraint_info        (ConstraintInfo      *info,
                                           MetaWindow          *window,
                                           MetaFrameGeometry   *orig_fgeom,
@@ -218,6 +229,8 @@ static const Constraint all_constraints[] = {
   {constrain_fully_onscreen,     "constrain_fully_onscreen"},
   {constrain_titlebar_visible,   "constrain_titlebar_visible"},
   {constrain_partially_onscreen, "constrain_partially_onscreen"},
+  {constrain_not_too_small,      "constrain_not_too_small"},
+
   {NULL,                         NULL}
 };
 
@@ -1380,4 +1393,96 @@ constrain_partially_onscreen (MetaWindow         *window,
                                               vert_amount_onscreen);
 
   return retval;
+}
+
+static gboolean
+constrain_not_too_small (MetaWindow         *window,
+                         ConstraintInfo     *info,
+                         ConstraintPriority  priority,
+                         gboolean            check_only)
+{
+  gboolean already_satisfied = TRUE;
+  gboolean resize = FALSE;
+  gint screen_width, screen_height, width, height;
+  gint x = 0, y = 0, old_x = 0, old_y;
+  MetaRectangle *start_rect;
+  MetaRectangle min_size, max_size;
+
+  if (priority > PRIORITY_NOT_TOO_SMALL || /* None of our businesss */
+      info->is_user_action ||              /* Don't mess users about */
+      window->user_placed    ||
+      window->type != META_WINDOW_NORMAL)  /* App windows only */
+    return TRUE;
+
+  old_x = info->current.x - info->fgeom->left_width;
+  old_y = info->current.y - info->fgeom->top_height;
+
+  width  = info->current.width  +
+    info->fgeom->left_width + info->fgeom->right_width;
+  height = info->current.height +
+    info->fgeom->top_height + info->fgeom->bottom_height;
+
+  screen_width  = info->work_area_monitor.width;
+  screen_height = info->work_area_monitor.height;
+
+  if (width == screen_width && height == screen_height)
+    return TRUE;
+
+  if ((((gfloat)width / (gfloat) screen_width) > NOT_TOO_SMALL_TRIGGER))
+    {
+      already_satisfied = FALSE;
+      resize = TRUE;
+    }
+
+  if (!resize)
+    {
+      /*
+       * If we are not resizing the application, attempt to center it.
+       */
+      x = (screen_width  - width) / 2;
+      y = (screen_height > height) ? (screen_height - height) / 2 : 0;
+
+      if (x != old_x || y != old_y)
+        already_satisfied = FALSE;
+    }
+
+  if (check_only || already_satisfied)
+    return already_satisfied;
+
+  if (resize)
+    {
+      width  = screen_width - 2 * NOT_TOO_SMALL_BORDER;
+      height = screen_height - 2 * NOT_TOO_SMALL_BORDER;
+
+      /* We respect both the max and min size hints */
+      /* We should include the frame here */
+      get_size_limits (window, info->fgeom, TRUE, &min_size, &max_size);
+
+      if (width > max_size.width)
+          width = max_size.width;
+      else if (width < min_size.width)
+          width = min_size.width;
+
+      if (height > max_size.height)
+          height = max_size.height;
+      else if (height < min_size.height)
+          height = min_size.height;
+
+      x = (screen_width  - width) / 2;
+      y = (screen_height > height) ? (screen_height - height) / 2 : 0;
+    }
+
+  if (info->action_type == ACTION_MOVE_AND_RESIZE)
+    start_rect = &info->current;
+  else
+    start_rect = &info->orig;
+
+  start_rect->x      = x;
+  start_rect->y      = y;
+  start_rect->width  = width;
+  start_rect->height = height;
+
+  unextend_by_frame (start_rect, info->fgeom);
+
+  return TRUE;
 }
