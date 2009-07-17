@@ -8833,3 +8833,20 @@ meta_window_get_transient_for (MetaWindow *window)
   else
     return NULL;
 }
+
+/**
+ * meta_window_get_net_wm_pid:
+ * @window: a #MetaWindow
+ *
+ * Returns the value of the _NET_WM_PID property for given window
+ *
+ * Return value: (transfer none): The value of the property, or -1 is not set.
+ */
+int
+meta_window_get_net_wm_pid (MetaWindow *window)
+{
+  g_return_val_if_fail (META_IS_WINDOW (window), -1);
+
+  return window->net_wm_pid;
+}
+

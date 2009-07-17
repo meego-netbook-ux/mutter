@@ -112,5 +112,6 @@ const char *meta_window_get_title (MetaWindow *window);
 MetaWindow *meta_window_get_transient_for (MetaWindow *window);
 void        meta_window_delete             (MetaWindow  *window,
                                             guint32      timestamp);
+int         meta_window_get_net_wm_pid (MetaWindow *window);
 
 #endif
