@@ -28,6 +28,7 @@
 #define N_(x) x
 
 #include <clutter/clutter.h>
+#include <clutter/x11/clutter-x11.h>
 #include <gmodule.h>
 #include <string.h>
 
@@ -88,6 +89,8 @@ static void kill_effect (MutterPlugin *plugin,
                          MutterWindow *actor, gulong event);
 
 static const MutterPluginInfo * plugin_info (MutterPlugin *plugin);
+
+static gboolean xevent_filter (MutterPlugin *plugin, XEvent *xev);
 
 MUTTER_PLUGIN_DECLARE(MutterDefaultPlugin, mutter_default_plugin);
 
@@ -224,6 +227,7 @@ mutter_default_plugin_class_init (MutterDefaultPluginClass *klass)
   plugin_class->switch_workspace = switch_workspace;
   plugin_class->kill_effect      = kill_effect;
   plugin_class->plugin_info      = plugin_info;
+  plugin_class->xevent_filter    = xevent_filter;
 
   g_type_class_add_private (gobject_class, sizeof (MutterDefaultPluginPrivate));
 }
@@ -792,4 +796,10 @@ plugin_info (MutterPlugin *plugin)
   MutterDefaultPluginPrivate *priv = MUTTER_DEFAULT_PLUGIN (plugin)->priv;
 
   return &priv->info;
+}
+
+static gboolean
+xevent_filter (MutterPlugin *plugin, XEvent *xev)
+{
+  return (clutter_x11_handle_event (xev) != CLUTTER_X11_FILTER_CONTINUE);
 }
