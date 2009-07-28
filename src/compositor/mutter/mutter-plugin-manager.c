@@ -29,6 +29,8 @@
 #include "mutter-module.h"
 
 #include <string.h>
+#include <clutter/clutter.h>
+#include <clutter/x11/clutter-x11.h>
 
 /*
  * There is only one instace of each module per the process.
@@ -590,6 +592,16 @@ mutter_plugin_manager_xevent_filter (MutterPluginManager *plugin_mgr,
     return FALSE;
 
   l = plugin_mgr->plugins;
+
+  /*
+   * If we have no plugins, we must pump the xevent into clutter; if we have
+   * a plugin, we expect the plugin to do that, which is not entirely right.
+   * Proper fix is pending upstream.
+   */
+  if (!l)
+    {
+      return (clutter_x11_handle_event (xev) != CLUTTER_X11_FILTER_CONTINUE);
+    }
 
   while (l)
     {
