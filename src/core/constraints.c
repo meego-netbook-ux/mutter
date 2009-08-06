@@ -1431,9 +1431,6 @@ constrain_not_too_small (MetaWindow         *window,
     {
       already_satisfied = FALSE;
       resize = TRUE;
-
-      x = NOT_TOO_SMALL_BORDER;
-      y = NOT_TOO_SMALL_BORDER;
     }
 
   if (!resize)
@@ -1453,24 +1450,25 @@ constrain_not_too_small (MetaWindow         *window,
 
   if (resize)
     {
-      width = screen_width - 2 * NOT_TOO_SMALL_BORDER;
+      width  = screen_width - 2 * NOT_TOO_SMALL_BORDER;
       height = screen_height - 2 * NOT_TOO_SMALL_BORDER;
 
-      /* We respect the max size hints */
+      /* We respect both the max and min size hints */
       /* We should include the frame here */
       get_size_limits (window, info->fgeom, TRUE, &min_size, &max_size);
 
       if (width > max_size.width)
-        {
           width = max_size.width;
-          x = (screen_width  - width) / 2;
-        }
+      else if (width < min_size.width)
+          width = min_size.width;
 
       if (height > max_size.height)
-        {
           height = max_size.height;
-          y = (screen_height - height) / 2;
-        }
+      else if (height < min_size.height)
+          height = min_size.height;
+
+      x = (screen_width  - width) / 2;
+      y = (screen_height - height) / 2;
     }
 
   if (info->action_type == ACTION_MOVE_AND_RESIZE)
