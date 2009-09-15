@@ -309,6 +309,36 @@ mutter_meta_window_decorated_notify (MetaWindow *mw,
 }
 
 static void
+mutter_window_maybe_hide_shadow (MutterWindow *self)
+{
+  MutterWindowPrivate *priv = self->priv;
+
+  /*
+   * If the window has a shadow, if it covers the entire screen, hide the shadow
+   * (so we avoid painting it, since it is not visible), and if it does not
+   * cover the whole screen, make sure the shadow is in fact not hidden.
+   */
+  if (priv->shadow)
+    {
+      gint screen_width, screen_height;
+
+      meta_screen_get_size (priv->screen, &screen_width, &screen_height);
+
+      if (priv->attrs.x <= 0 &&
+          priv->attrs.y <= 0 &&
+          priv->attrs.x + priv->attrs.width  >= screen_width &&
+          priv->attrs.y + priv->attrs.height >= screen_height)
+        {
+          clutter_actor_hide (priv->shadow);
+        }
+      else
+        {
+          clutter_actor_show (priv->shadow);
+        }
+    }
+}
+
+static void
 mutter_window_constructed (GObject *object)
 {
   MutterWindow        *self     = MUTTER_WINDOW (object);
@@ -349,6 +379,7 @@ mutter_window_constructed (GObject *object)
       priv->shadow = mutter_create_shadow_frame (compositor);
 
       clutter_container_add_actor (CLUTTER_CONTAINER (self), priv->shadow);
+      mutter_window_maybe_hide_shadow (self);
     }
 
   if (!priv->actor)
@@ -1013,6 +1044,8 @@ mutter_window_sync_actor_position (MutterWindow *self)
   priv->attrs.x = window_rect.x;
   priv->attrs.y = window_rect.y;
 
+  mutter_window_maybe_hide_shadow (self);
+
   if (mutter_window_effect_in_progress (self))
     return;
 
@@ -1406,7 +1439,7 @@ mutter_window_set_visible_region_beneath (MutterWindow *self,
 {
   MutterWindowPrivate *priv = self->priv;
 
-  if (priv->shadow)
+  if (priv->shadow && CLUTTER_ACTOR_IS_VISIBLE (priv->shadow))
     {
       GdkRectangle shadow_rect;
       ClutterActorBox box;
