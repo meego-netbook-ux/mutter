@@ -147,7 +147,8 @@ struct _MetaScreenClass
 {
   GObjectClass parent_class;
 
-  void (*restacked) (MetaScreen *);
+  void (*restacked)        (MetaScreen *);
+  void (*workarea_changed) (MetaScreen *);
 };
 
 MetaScreen*   meta_screen_new                 (MetaDisplay                *display,
