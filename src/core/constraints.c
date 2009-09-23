@@ -1410,6 +1410,7 @@ constrain_not_too_small (MetaWindow         *window,
 
   if (priority > PRIORITY_NOT_TOO_SMALL || /* None of our businesss */
       info->is_user_action ||              /* Don't mess users about */
+      window->user_placed    ||
       window->type != META_WINDOW_NORMAL)  /* App windows only */
     return TRUE;
 
