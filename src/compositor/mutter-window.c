@@ -97,7 +97,6 @@ static void mutter_window_get_property (GObject      *object,
 					   GValue       *value,
 					   GParamSpec   *pspec);
 
-static void     mutter_window_detach     (MutterWindow *self);
 static gboolean mutter_window_has_shadow (MutterWindow *self);
 
 static void mutter_window_clear_shape_region    (MutterWindow *self);
@@ -950,12 +949,19 @@ mutter_window_effect_completed (MutterWindow *self,
     mutter_window_after_effects (self);
 }
 
-/* Called to drop our reference to a window backing pixmap that we
+/**
+ * mutter_window_detach:
+ * @self: a #MutterWindow
+ *
+ * Called to drop our reference to a window backing pixmap that we
  * previously obtained with XCompositeNameWindowPixmap. We do this
  * when the window is unmapped or when we want to update to a new
  * pixmap for a new size.
+ *
+ * This function is intended for internal use; if you are calling it externally,
+ * you are likely doing something you should not.
  */
-static void
+void
 mutter_window_detach (MutterWindow *self)
 {
   MutterWindowPrivate *priv     = self->priv;
