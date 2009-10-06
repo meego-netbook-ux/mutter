@@ -85,6 +85,14 @@ enum
   PROP_MCW_NO_SHADOW,
 };
 
+enum
+{
+  WINDOW_DESTROYED,
+  LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0 };
+
 static void mutter_window_dispose    (GObject *object);
 static void mutter_window_finalize   (GObject *object);
 static void mutter_window_constructed (GObject *object);
@@ -216,6 +224,15 @@ mutter_window_class_init (MutterWindowClass *klass)
   g_object_class_install_property (object_class,
                                    PROP_MCW_NO_SHADOW,
                                    pspec);
+
+  signals[WINDOW_DESTROYED] =
+    g_signal_new ("window-destroyed",
+		  G_TYPE_FROM_CLASS (object_class),
+                  G_SIGNAL_RUN_LAST,
+		  0,
+		  NULL, NULL,
+		  g_cclosure_marshal_VOID__VOID,
+		  G_TYPE_NONE, 0);
 }
 
 static void
@@ -986,6 +1003,8 @@ mutter_window_destroy (MutterWindow *self)
   MetaWindow	      *window;
   MetaCompScreen      *info;
   MutterWindowPrivate *priv;
+
+  g_signal_emit (self, signals[WINDOW_DESTROYED], 0);
 
   priv = self->priv;
 
