@@ -17,12 +17,34 @@
 #define TILE_WIDTH  (3*MAX_TILE_SZ)
 #define TILE_HEIGHT (3*MAX_TILE_SZ)
 
+MutterShadow *
+mutter_shadow_new (void)
+{
+  return g_new0 (MutterShadow, 1);
+}
+
+void
+mutter_shadow_destroy (MutterShadow *shadow)
+{
+  clutter_actor_destroy (shadow->actor);
+  g_free (shadow);
+}
+
 static unsigned char* shadow_gaussian_make_tile (void);
 
-ClutterActor *
-mutter_create_shadow_frame (MetaCompositor *compositor)
+MutterShadow *
+mutter_shadow_create_for_window (MetaCompositor *compositor, MutterWindow *mcw)
 {
-  ClutterActor *frame;
+  ClutterActor   *frame;
+  MutterShadow   *shadow;
+  MetaWindow     *mw = mutter_window_get_meta_window (mcw);
+  MetaScreen	 *screen = meta_window_get_screen (mw);
+  MetaCompScreen *info = meta_screen_get_compositor_data (screen);
+
+  if ((shadow = mutter_plugin_manager_get_shadow (info->plugin_mgr, mcw)))
+    return shadow;
+
+  shadow = mutter_shadow_new ();
 
   if (!compositor->shadow_src)
     {
@@ -50,10 +72,11 @@ mutter_create_shadow_frame (MetaCompositor *compositor)
                                   MAX_TILE_SZ,
                                   MAX_TILE_SZ);
 
-  clutter_actor_set_position (frame,
-                              SHADOW_OFFSET_X , SHADOW_OFFSET_Y);
+  shadow->actor       = frame;
+  shadow->attach_left = SHADOW_OFFSET_X;
+  shadow->attach_top  = SHADOW_OFFSET_Y;
 
-  return frame;
+  return shadow;
 }
 
 typedef struct GaussianMap

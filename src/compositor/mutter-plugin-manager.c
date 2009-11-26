@@ -650,3 +650,30 @@ mutter_plugin_manager_xevent_filter (MutterPluginManager *plugin_mgr,
 
   return FALSE;
 }
+
+MutterShadow *
+mutter_plugin_manager_get_shadow (MutterPluginManager *mgr,
+                                  MutterWindow        *window)
+{
+  GList *l;
+
+  if (!mgr)
+    return NULL;
+
+  l = mgr->plugins;
+
+  while (l)
+    {
+      MutterPlugin      *plugin = l->data;
+      MutterPluginClass *klass = MUTTER_PLUGIN_GET_CLASS (plugin);
+
+      if (klass->get_shadow)
+        {
+          return klass->get_shadow (plugin, window);
+        }
+
+      l = l->next;
+    }
+
+  return NULL;
+}
