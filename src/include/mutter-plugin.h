@@ -27,6 +27,7 @@
 #include "types.h"
 #include "compositor.h"
 #include "compositor-mutter.h"
+#include "mutter-shadow.h"
 
 #include <clutter/clutter.h>
 #include <X11/extensions/Xfixes.h>
@@ -115,6 +116,9 @@ struct _MutterPluginClass
                              XEvent             *event);
 
   const MutterPluginInfo * (*plugin_info) (MutterPlugin *plugin);
+
+  MutterShadow           * (*get_shadow) (MutterPlugin *plugin,
+                                          MutterWindow *window);
 };
 
 struct _MutterPluginInfo
