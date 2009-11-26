@@ -19,7 +19,8 @@
 #include "compositor-private.h"
 #include "mutter-shaped-texture.h"
 #include "mutter-window-private.h"
-#include "shadow.h"
+#include "mutter-shadow.h"
+#include "mutter-enum-types.h"
 #include "tidy/tidy-texture-frame.h"
 
 struct _MutterWindowPrivate
@@ -31,7 +32,7 @@ struct _MutterWindowPrivate
   MetaScreen       *screen;
 
   ClutterActor     *actor;
-  ClutterActor     *shadow;
+  MutterShadow     *shadow;
   Pixmap            back_pixmap;
 
   MetaCompWindowType  type;
@@ -76,9 +77,9 @@ struct _MutterWindowPrivate
 
   guint		    needs_destroy	   : 1;
 
-  guint             no_shadow              : 1;
-
   guint             no_more_x_calls        : 1;
+
+  MutterShadowType  shadow_type;
 };
 
 enum
@@ -87,7 +88,7 @@ enum
   PROP_MCW_META_SCREEN,
   PROP_MCW_X_WINDOW,
   PROP_MCW_X_WINDOW_ATTRIBUTES,
-  PROP_MCW_NO_SHADOW,
+  PROP_MCW_SHADOW_TYPE,
 };
 
 enum
@@ -220,14 +221,15 @@ mutter_window_class_init (MutterWindowClass *klass)
                                    PROP_MCW_X_WINDOW_ATTRIBUTES,
                                    pspec);
 
-  pspec = g_param_spec_boolean ("no-shadow",
-                                "No shadow",
-                                "Do not add shaddow to this window",
-                                FALSE,
-                                G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
+  pspec = g_param_spec_enum ("shadow-type",
+                             "Shadow Type",
+                             "Whether this window should have shadow",
+                             MUTTER_TYPE_SHADOW_TYPE,
+                             MUTTER_SHADOW_AUTOMATIC,
+                             G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
 
   g_object_class_install_property (object_class,
-                                   PROP_MCW_NO_SHADOW,
+                                   PROP_MCW_SHADOW_TYPE,
                                    pspec);
 
   signals[WINDOW_DESTROYED] =
@@ -310,13 +312,7 @@ mutter_meta_window_decorated_notify (MetaWindow *mw,
 
   if (priv->shadow)
     {
-      ClutterActor *p = clutter_actor_get_parent (priv->shadow);
-
-      if (CLUTTER_IS_CONTAINER (p))
-        clutter_container_remove_actor (CLUTTER_CONTAINER (p), priv->shadow);
-      else
-        clutter_actor_unparent (priv->shadow);
-
+      mutter_shadow_destroy (priv->shadow);
       priv->shadow = NULL;
     }
 
@@ -365,9 +361,17 @@ mutter_window_constructed (GObject *object)
 
   if (mutter_window_has_shadow (self))
     {
-      priv->shadow = mutter_create_shadow_frame (compositor);
+      priv->shadow = mutter_shadow_create_for_window (compositor, self);
 
-      clutter_container_add_actor (CLUTTER_CONTAINER (self), priv->shadow);
+      if (priv->shadow)
+        {
+          clutter_actor_set_position (priv->shadow->actor,
+                                      priv->shadow->attach_left,
+                                      priv->shadow->attach_top);
+
+          clutter_container_add_actor (CLUTTER_CONTAINER (self),
+                                       priv->shadow->actor);
+        }
     }
 
   if (!priv->actor)
@@ -420,6 +424,9 @@ mutter_window_dispose (GObject *object)
   display  = meta_screen_get_display (screen);
   xdisplay = meta_display_get_xdisplay (display);
   info     = meta_screen_get_compositor_data (screen);
+
+  if (priv->shadow)
+    mutter_shadow_destroy (priv->shadow);
 
   mutter_window_detach (self);
 
@@ -480,23 +487,28 @@ mutter_window_set_property (GObject      *object,
     case PROP_MCW_X_WINDOW_ATTRIBUTES:
       priv->attrs = *((XWindowAttributes*)g_value_get_boxed (value));
       break;
-    case PROP_MCW_NO_SHADOW:
+    case PROP_MCW_SHADOW_TYPE:
       {
-        gboolean oldv = priv->no_shadow ? TRUE : FALSE;
-        gboolean newv = g_value_get_boolean (value);
+        MutterShadowType oldv = priv->shadow_type;
+        MutterShadowType newv = g_value_get_enum (value);
 
         if (oldv == newv)
           return;
 
-        priv->no_shadow = newv;
+        /*
+         * Setting the stored value to the new type at this point means that
+         * mutter_window_has_shadow() will do the right thing for us in the
+         * ifs below.
+         */
+        priv->shadow_type = newv;
 
-        if (newv && priv->shadow)
+        if (priv->shadow && !mutter_window_has_shadow (self))
           {
-            clutter_container_remove_actor (CLUTTER_CONTAINER (object),
-                                            priv->shadow);
+            mutter_shadow_destroy (priv->shadow);
+
             priv->shadow = NULL;
           }
-        else if (!newv && !priv->shadow && mutter_window_has_shadow (self))
+        else if (!priv->shadow && mutter_window_has_shadow (self))
           {
             gfloat       w, h;
             MetaDisplay *display = meta_screen_get_display (priv->screen);
@@ -506,11 +518,23 @@ mutter_window_set_property (GObject      *object,
 
             clutter_actor_get_size (CLUTTER_ACTOR (self), &w, &h);
 
-            priv->shadow = mutter_create_shadow_frame (compositor);
+            priv->shadow = mutter_shadow_create_for_window (compositor, self);
 
-            clutter_actor_set_size (priv->shadow, w, h);
+            if (priv->shadow)
+              {
+                clutter_actor_set_position (priv->shadow->actor,
+                                            priv->shadow->attach_left,
+                                            priv->shadow->attach_top);
+                clutter_actor_set_size (priv->shadow->actor,
+                                        w + priv->shadow->attach_right -
+                                        priv->shadow->attach_left,
+                                        h + priv->shadow->attach_bottom -
+                                        priv->shadow->attach_top);
 
-            clutter_container_add_actor (CLUTTER_CONTAINER (self), priv->shadow);
+                clutter_container_add_actor (CLUTTER_CONTAINER (self),
+                                             priv->shadow->actor);
+                clutter_actor_lower (priv->shadow->actor, priv->actor);
+              }
           }
       }
       break;
@@ -542,8 +566,8 @@ mutter_window_get_property (GObject      *object,
     case PROP_MCW_X_WINDOW_ATTRIBUTES:
       g_value_set_boxed (value, &priv->attrs);
       break;
-    case PROP_MCW_NO_SHADOW:
-      g_value_set_boolean (value, priv->no_shadow);
+    case PROP_MCW_SHADOW_TYPE:
+      g_value_set_enum (value, priv->shadow_type);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -582,8 +606,11 @@ mutter_window_has_shadow (MutterWindow *self)
 {
   MutterWindowPrivate * priv = self->priv;
 
-  if (priv->no_shadow)
+  if (priv->shadow_type == MUTTER_SHADOW_NEVER)
     return FALSE;
+
+  if (priv->shadow_type == MUTTER_SHADOW_ALWAYS)
+    return TRUE;
 
   /*
    * Always put a shadow around windows with a frame - This should override
@@ -1547,7 +1574,7 @@ mutter_window_set_visible_region_beneath (MutterWindow *self,
        * the shadow is completely obscured and doesn't need to be drawn
        * at all.
        */
-      clutter_actor_get_allocation_box (priv->shadow, &box);
+      clutter_actor_get_allocation_box (priv->shadow->actor, &box);
 
       shadow_rect.x = roundf (box.x1);
       shadow_rect.y = roundf (box.y1);
@@ -1556,8 +1583,10 @@ mutter_window_set_visible_region_beneath (MutterWindow *self,
 
       overlap = meta_region_contains_rectangle (beneath_region, &shadow_rect);
 
-      tidy_texture_frame_set_needs_paint (TIDY_TEXTURE_FRAME (priv->shadow),
-                                          overlap != META_REGION_OVERLAP_OUT);
+      if (TIDY_IS_TEXTURE_FRAME (priv->shadow->actor))
+        tidy_texture_frame_set_needs_paint (
+                                      TIDY_TEXTURE_FRAME (priv->shadow->actor),
+                                      overlap != META_REGION_OVERLAP_OUT);
     }
 }
 
@@ -1575,8 +1604,10 @@ mutter_window_reset_visible_regions (MutterWindow *self)
 
   mutter_shaped_texture_set_clip_region (MUTTER_SHAPED_TEXTURE (priv->actor),
                                          NULL);
-  if (priv->shadow)
-    tidy_texture_frame_set_needs_paint (TIDY_TEXTURE_FRAME (priv->shadow), TRUE);
+  if (priv->shadow && TIDY_IS_TEXTURE_FRAME (priv->shadow->actor))
+    tidy_texture_frame_set_needs_paint (
+                                     TIDY_TEXTURE_FRAME (priv->shadow->actor),
+                                     TRUE);
 }
 
 static void
@@ -1660,7 +1691,11 @@ check_needs_pixmap (MutterWindow *self)
                     NULL);
 
       if (priv->shadow)
-        clutter_actor_set_size (priv->shadow, pxm_width, pxm_height);
+        clutter_actor_set_size (priv->shadow->actor,
+                                pxm_width + priv->shadow->attach_right -
+                                priv->shadow->attach_left,
+                                pxm_height + priv->shadow->attach_bottom -
+                                priv->shadow->attach_top);
 
       mutter_window_update_bounding_region (self, pxm_width, pxm_height);
 

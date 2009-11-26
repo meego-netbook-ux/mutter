@@ -70,4 +70,7 @@ gboolean mutter_plugin_manager_switch_workspace (MutterPluginManager *mgr,
 gboolean mutter_plugin_manager_xevent_filter (MutterPluginManager *mgr,
 					      XEvent *xev);
 
+MutterShadow * mutter_plugin_manager_get_shadow (MutterPluginManager *mgr,
+                                                 MutterWindow *window);
+
 #endif
