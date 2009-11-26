@@ -8,7 +8,7 @@ m4_define([moblin_version],[0.0])
 m4_define([mutter_version],
           [mutter_major_version.mutter_minor_version.mutter_micro_version'_'moblin_version])
 
-m4_define([mutter_plugin_api_version], [2])
+m4_define([mutter_plugin_api_version], [3])
 
 AC_INIT([mutter], [mutter_version],
         [http://bugzilla.gnome.org/enter_bug.cgi?product=mutter])

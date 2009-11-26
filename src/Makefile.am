@@ -32,8 +32,7 @@ mutter_SOURCES= 				\
 	compositor/mutter-window-private.h	\
 	compositor/mutter-window-group.c	\
 	compositor/mutter-window-group.h	\
-	compositor/shadow.c			\
-	compositor/shadow.h			\
+	compositor/mutter-shadow.c		\
 	compositor/mutter-shaped-texture.h	\
 	compositor/tidy/tidy-texture-frame.c	\
 	compositor/tidy/tidy-texture-frame.h	\
@@ -168,7 +167,8 @@ libmutterinclude_base_headers =		\
 	include/group.h				\
 	include/keybindings.h			\
 	include/mutter-plugin.h			\
-	include/mutter-window.h
+	include/mutter-window.h			\
+	include/mutter-shadow.h
 
 # Excluded from scanning for introspection but installed
 # preview-widget.h: only part of libmutter-private
