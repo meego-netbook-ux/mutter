@@ -30,7 +30,7 @@ struct _MutterShadow
 };
 
 MutterShadow * mutter_shadow_new               (void);
-void           mutter_shadow_free              (MutterShadow *shadow);
+void           mutter_shadow_destroy           (MutterShadow *shadow);
 MutterShadow * mutter_shadow_create_for_window (MetaCompositor *compositor,
                                                 MutterWindow   *window);
 

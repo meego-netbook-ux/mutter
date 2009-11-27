@@ -310,15 +310,7 @@ mutter_meta_window_decorated_notify (MetaWindow *mw,
 
   if (priv->shadow)
     {
-      ClutterActor *p = clutter_actor_get_parent (priv->shadow->actor);
-
-      if (CLUTTER_IS_CONTAINER (p))
-        clutter_container_remove_actor (CLUTTER_CONTAINER (p),
-                                        priv->shadow->actor);
-      else
-        clutter_actor_unparent (priv->shadow->actor);
-
-      mutter_shadow_free (priv->shadow);
+      mutter_shadow_destroy (priv->shadow);
       priv->shadow = NULL;
     }
 
@@ -434,6 +426,9 @@ mutter_window_dispose (GObject *object)
   xdisplay = meta_display_get_xdisplay (display);
   info     = meta_screen_get_compositor_data (screen);
 
+  if (priv->shadow)
+    mutter_shadow_destroy (priv->shadow);
+
   mutter_window_detach (self);
 
   mutter_window_clear_shape_region (self);
@@ -511,10 +506,7 @@ mutter_window_set_property (GObject      *object,
 
         if (priv->shadow && !mutter_window_has_shadow (self))
           {
-            clutter_container_remove_actor (CLUTTER_CONTAINER (object),
-                                            priv->shadow->actor);
-
-            mutter_shadow_free (priv->shadow);
+            mutter_shadow_destroy (priv->shadow);
 
             priv->shadow = NULL;
           }

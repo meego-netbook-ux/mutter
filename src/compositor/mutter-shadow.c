@@ -24,7 +24,7 @@ mutter_shadow_new (void)
 }
 
 void
-mutter_shadow_free (MutterShadow *shadow)
+mutter_shadow_destroy (MutterShadow *shadow)
 {
   clutter_actor_destroy (shadow->actor);
   g_free (shadow);
