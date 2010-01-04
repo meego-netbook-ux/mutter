@@ -6384,8 +6384,10 @@ meta_window_update_icon_now (MetaWindow *window)
       redraw_icon (window);
     }
 
+#if 0
   g_assert (window->icon);
   g_assert (window->mini_icon);
+#endif
 }
 
 static gboolean
