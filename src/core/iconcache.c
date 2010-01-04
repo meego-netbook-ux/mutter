@@ -519,8 +519,8 @@ meta_icon_cache_init (MetaIconCache *icon_cache)
   icon_cache->ideal_mini_width = -1;
   icon_cache->ideal_mini_height = -1;
 #endif
-  icon_cache->want_fallback = TRUE;
-  icon_cache->wm_hints_dirty = TRUE;
+  icon_cache->want_fallback = FALSE;
+  icon_cache->wm_hints_dirty = FALSE;
   icon_cache->kwm_win_icon_dirty = TRUE;
   icon_cache->net_wm_icon_dirty = TRUE;
 }
