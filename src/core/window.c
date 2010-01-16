@@ -42,6 +42,7 @@
 #include "group.h"
 #include "window-props.h"
 #include "constraints.h"
+#include "constraints-private.h"
 #include "mutter-enum-types.h"
 
 #include <X11/Xatom.h>

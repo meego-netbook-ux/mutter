@@ -26,6 +26,15 @@
 
 #include "types.h"
 
+struct _MetaFrameGeometry
+{
+  /* border sizes (space between frame and child) */
+  int left_width;
+  int right_width;
+  int top_height;
+  int bottom_height;
+};
+
 Window meta_frame_get_xwindow (MetaFrame *frame);
 
 #endif
