@@ -27,17 +27,6 @@
 #include "frame.h"
 #include "window-private.h"
 
-typedef struct _MetaFrameGeometry MetaFrameGeometry;
-
-struct _MetaFrameGeometry
-{  
-  /* border sizes (space between frame and child) */
-  int left_width;
-  int right_width;
-  int top_height;
-  int bottom_height;
-};
-
 struct _MetaFrame
 {
   /* window we frame */

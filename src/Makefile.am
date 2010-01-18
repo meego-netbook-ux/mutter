@@ -46,7 +46,8 @@ mutter_SOURCES= 				\
 	include/region.h			\
 	include/compositor-mutter.h 		\
 	core/constraints.c			\
-	core/constraints.h			\
+	core/constraints-private.h		\
+	include/constraints.h			\
 	core/core.c				\
 	core/delete.c				\
 	core/display.c				\
@@ -171,6 +172,8 @@ libmutterinclude_base_headers =		\
 	include/display.h			\
 	include/group.h				\
 	include/keybindings.h			\
+	include/frame.h				\
+	include/constraints.h			\
 	include/mutter-plugin.h			\
 	include/mutter-window.h			\
 	include/mutter-shadow.h
