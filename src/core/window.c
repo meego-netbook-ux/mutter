@@ -141,7 +141,8 @@ enum {
   PROP_WINDOW_TYPE,
   PROP_USER_TIME,
   PROP_DEMANDS_ATTENTION,
-  PROP_URGENT
+  PROP_URGENT,
+  PROP_MUTTER_HINTS
 };
 
 enum
@@ -216,6 +217,9 @@ meta_window_get_property(GObject         *object,
       break;
     case PROP_URGENT:
       g_value_set_boolean (value, win->wm_hints_urgent);
+      break;
+    case PROP_MUTTER_HINTS:
+      g_value_set_string (value, win->title);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -321,6 +325,13 @@ meta_window_class_init (MetaWindowClass *klass)
                                                          FALSE,
                                                          G_PARAM_READABLE));
 
+  g_object_class_install_property (object_class,
+                                   PROP_MUTTER_HINTS,
+                                   g_param_spec_string ("mutter-hints",
+                                                        "_MUTTER_HINTS",
+                                                        "_MUTTER_HINTS for this window",
+                                                        NULL,
+                                                        G_PARAM_READABLE));
   window_signals[WORKSPACE_CHANGED] =
     g_signal_new ("workspace-changed",
                   G_TYPE_FROM_CLASS (object_class),
@@ -8871,7 +8882,7 @@ meta_window_get_description (MetaWindow *window)
 /**
  * meta_window_get_wm_class:
  * @window: a #MetaWindow
- * 
+ *
  * Return the current value of the WM_CLASS X property.
  */
 const char *
@@ -9050,4 +9061,18 @@ meta_window_is_user_placed (MetaWindow *window)
   g_return_val_if_fail (META_IS_WINDOW (window), FALSE);
 
   return window->user_placed;
+}
+
+/**
+ * meta_window_get_mutter_hints:
+ * @window: a #MetaWindow
+ *
+ * Returns the current value of the _MUTTER_HINTS property.
+ */
+const char *
+meta_window_get_mutter_hints (MetaWindow *window)
+{
+  g_return_val_if_fail (META_IS_WINDOW (window), NULL);
+
+  return window->mutter_hints;
 }

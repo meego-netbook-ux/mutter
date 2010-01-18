@@ -169,5 +169,6 @@ item(_NET_WM_FULLSCREEN_MONITORS)
 /* item(_NET_RESTACK_WINDOW) */
 #endif
 
+item(_MUTTER_HINTS)
 /* eof atomnames.h */
 
