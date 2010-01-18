@@ -3794,6 +3794,9 @@ meta_window_move_resize_internal (MetaWindow          *window,
   /* The action has to be a move or a resize or both... */
   g_assert (flags & (META_IS_MOVE_ACTION | META_IS_RESIZE_ACTION));
 
+  if (is_user_action)
+    window->user_placed = TRUE;
+
   /* We don't need it in the idle queue anymore. */
   meta_window_unqueue (window, META_QUEUE_MOVE_RESIZE);
 
@@ -9028,4 +9031,22 @@ meta_window_is_modal (MetaWindow *window)
   g_return_val_if_fail (META_IS_WINDOW (window), FALSE);
 
   return window->wm_state_modal;
+}
+
+/**
+ * meta_window_is_user_placed:
+ * @window: a #MetaWindow
+ *
+ * Queries whether the size and position of the window was assigned by the
+ * window manager, or is due to user action.
+ *
+ * Return value: (transfer none): TRUE if the window was positioned or resized
+ * by the user.
+ */
+gboolean
+meta_window_is_user_placed (MetaWindow *window)
+{
+  g_return_val_if_fail (META_IS_WINDOW (window), FALSE);
+
+  return window->user_placed;
 }
