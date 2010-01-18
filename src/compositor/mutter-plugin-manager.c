@@ -1,7 +1,7 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
 /*
- * Copyright (c) 2008 Intel Corp.
+ * Copyright (c) 2008, 2010 Intel Corp.
  *
  * Author: Tomas Frydrych <tf@linux.intel.com>
  *
@@ -676,4 +676,39 @@ mutter_plugin_manager_get_shadow (MutterPluginManager *mgr,
     }
 
   return NULL;
+}
+
+/*
+ * This function needs to return TRUE by default (meaning 'constraint already
+ * satisfied').
+ */
+gboolean
+mutter_plugin_manager_constrain_window (MutterPluginManager *mgr,
+                                        MetaWindow          *window,
+                                        ConstraintInfo      *info,
+                                        ConstraintPriority   priority,
+                                        gboolean             check_only)
+{
+  GList *l;
+
+  if (!mgr)
+    return TRUE;
+
+  l = mgr->plugins;
+
+  while (l)
+    {
+      MutterPlugin      *plugin = l->data;
+      MutterPluginClass *klass = MUTTER_PLUGIN_GET_CLASS (plugin);
+
+      if (klass->constrain_window)
+        {
+          return klass->constrain_window (plugin, window, info, priority,
+                                          check_only);
+        }
+
+      l = l->next;
+    }
+
+  return TRUE;
 }

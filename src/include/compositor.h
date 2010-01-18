@@ -29,6 +29,7 @@
 #include "boxes.h"
 #include "window.h"
 #include "workspace.h"
+#include "constraints.h"
 
 typedef enum _MetaCompWindowType
 {
@@ -182,5 +183,11 @@ void meta_compositor_sync_screen_size          (MetaCompositor *compositor,
                                                 MetaScreen     *screen,
                                                 guint           width,
                                                 guint           height);
+
+gboolean meta_compositor_constrain_window (MetaCompositor     *compositor,
+                                           MetaWindow         *window,
+                                           ConstraintInfo     *info,
+                                           ConstraintPriority  priority,
+                                           gboolean            check_only);
 
 #endif /* META_COMPOSITOR_H */

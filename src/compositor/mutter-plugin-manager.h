@@ -1,7 +1,7 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
 /*
- * Copyright (c) 2008 Intel Corp.
+ * Copyright (c) 2008, 2010 Intel Corp.
  *
  * Author: Tomas Frydrych <tf@linux.intel.com>
  *
@@ -62,5 +62,12 @@ gboolean mutter_plugin_manager_xevent_filter (MutterPluginManager *mgr,
 
 MutterShadow * mutter_plugin_manager_get_shadow (MutterPluginManager *mgr,
                                                  MutterWindow *window);
+
+gboolean
+mutter_plugin_manager_constrain_window (MutterPluginManager *mgr,
+                                        MetaWindow          *window,
+                                        ConstraintInfo      *info,
+                                        ConstraintPriority   priority,
+                                        gboolean             check_only);
 
 #endif

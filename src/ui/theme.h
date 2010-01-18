@@ -27,6 +27,8 @@
 #include "boxes.h"
 #include "gradient.h"
 #include "common.h"
+#include "types.h"
+
 #include <gtk/gtk.h>
 
 typedef struct _MetaFrameStyle MetaFrameStyle;
@@ -38,7 +40,6 @@ typedef struct _MetaAlphaGradientSpec MetaAlphaGradientSpec;
 typedef struct _MetaColorSpec MetaColorSpec;
 typedef struct _MetaFrameLayout MetaFrameLayout;
 typedef struct _MetaButtonSpace MetaButtonSpace;
-typedef struct _MetaFrameGeometry MetaFrameGeometry;
 typedef struct _MetaTheme MetaTheme;
 typedef struct _MetaPositionExprEnv MetaPositionExprEnv;
 typedef struct _MetaDrawInfo MetaDrawInfo;
@@ -161,58 +162,6 @@ struct _MetaButtonSpace
   GdkRectangle visible;
   /** The screen area where the button can be activated by clicking */
   GdkRectangle clickable;
-};
-
-/**
- * Calculated actual geometry of the frame
- */
-struct _MetaFrameGeometry
-{
-  int left_width;
-  int right_width;
-  int top_height;
-  int bottom_height;
-
-  int width;
-  int height;  
-
-  GdkRectangle title_rect;
-
-  int left_titlebar_edge;
-  int right_titlebar_edge;
-  int top_titlebar_edge;
-  int bottom_titlebar_edge;
-
-  /* used for a memset hack */
-#define ADDRESS_OF_BUTTON_RECTS(fgeom) (((char*)(fgeom)) + G_STRUCT_OFFSET (MetaFrameGeometry, close_rect))
-#define LENGTH_OF_BUTTON_RECTS (G_STRUCT_OFFSET (MetaFrameGeometry, right_right_background) + sizeof (GdkRectangle) - G_STRUCT_OFFSET (MetaFrameGeometry, close_rect))
-  
-  /* The button rects (if changed adjust memset hack) */
-  MetaButtonSpace close_rect;
-  MetaButtonSpace max_rect;
-  MetaButtonSpace min_rect;
-  MetaButtonSpace menu_rect;
-  MetaButtonSpace shade_rect;
-  MetaButtonSpace above_rect;
-  MetaButtonSpace stick_rect;
-  MetaButtonSpace unshade_rect;
-  MetaButtonSpace unabove_rect;
-  MetaButtonSpace unstick_rect;
-
-#define MAX_MIDDLE_BACKGROUNDS (MAX_BUTTONS_PER_CORNER - 2)
-  GdkRectangle left_left_background;
-  GdkRectangle left_middle_backgrounds[MAX_MIDDLE_BACKGROUNDS];
-  GdkRectangle left_right_background;
-  GdkRectangle right_left_background;
-  GdkRectangle right_middle_backgrounds[MAX_MIDDLE_BACKGROUNDS];
-  GdkRectangle right_right_background;
-  /* End of button rects (if changed adjust memset hack) */
-  
-  /* Round corners */
-  guint top_left_corner_rounded_radius;
-  guint top_right_corner_rounded_radius;
-  guint bottom_left_corner_rounded_radius;
-  guint bottom_right_corner_rounded_radius;
 };
 
 typedef enum
