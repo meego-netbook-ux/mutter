@@ -524,6 +524,42 @@ reload_wm_name (MetaWindow    *window,
 }
 
 static void
+reload_mutter_hints (MetaWindow    *window,
+                     MetaPropValue *value,
+                     gboolean       initial)
+{
+  if (value->type != META_PROP_VALUE_INVALID)
+    {
+      char     *new_hints = value->v.str;
+      char     *old_hints = window->mutter_hints;
+      gboolean  changed   = FALSE;
+
+      if (new_hints)
+        {
+          if (!old_hints || strcmp (new_hints, old_hints))
+            changed = TRUE;
+        }
+      else
+        {
+          if (old_hints)
+            changed = TRUE;
+        }
+
+      if (changed)
+        {
+          g_free (old_hints);
+
+          if (new_hints)
+            window->mutter_hints = g_strdup (new_hints);
+          else
+            window->mutter_hints = NULL;
+
+          g_object_notify (G_OBJECT (window), "mutter-hints");
+        }
+    }
+}
+
+static void
 set_icon_title (MetaWindow *window,
                 const char *title)
 {
@@ -1529,6 +1565,7 @@ meta_display_init_window_prop_hooks (MetaDisplay *display)
     { display->atom__NET_WM_WINDOW_TYPE, META_PROP_VALUE_INVALID, reload_net_wm_window_type,  FALSE, TRUE },
     { display->atom__NET_WM_STRUT,         META_PROP_VALUE_INVALID, reload_struts,            FALSE, FALSE },
     { display->atom__NET_WM_STRUT_PARTIAL, META_PROP_VALUE_INVALID, reload_struts,            FALSE, FALSE },
+    { display->atom__MUTTER_HINTS,     META_PROP_VALUE_TEXT_PROPERTY, reload_mutter_hints,    TRUE,  FALSE },
     { 0 },
   };
 
