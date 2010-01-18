@@ -1,7 +1,7 @@
 /* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 
 /*
- * Copyright (c) 2008 Intel Corp.
+ * Copyright (c) 2008, 2010 Intel Corp.
  *
  * Author: Tomas Frydrych <tf@linux.intel.com>
  *
@@ -25,6 +25,7 @@
 #define MUTTER_PLUGIN_H_
 
 #include "types.h"
+#include "constraints.h"
 #include "compositor.h"
 #include "compositor-mutter.h"
 #include "mutter-shadow.h"
@@ -119,6 +120,12 @@ struct _MutterPluginClass
 
   MutterShadow           * (*get_shadow) (MutterPlugin *plugin,
                                           MutterWindow *window);
+
+  gboolean (*constrain_window) (MutterPlugin       *plugin,
+                                MetaWindow         *window,
+                                ConstraintInfo     *info,
+                                ConstraintPriority  priority,
+                                gboolean            check_only);
 };
 
 struct _MutterPluginInfo

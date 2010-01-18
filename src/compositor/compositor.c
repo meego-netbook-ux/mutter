@@ -1021,6 +1021,28 @@ meta_compositor_sync_screen_size (MetaCompositor  *compositor,
 		width, height);
 }
 
+gboolean
+meta_compositor_constrain_window (MetaCompositor     *compositor,
+                                  MetaWindow         *window,
+                                  ConstraintInfo     *constraint_info,
+                                  ConstraintPriority  priority,
+                                  gboolean            check_only)
+{
+  MetaScreen	      *screen = meta_window_get_screen (window);
+  MetaCompScreen      *info   = meta_screen_get_compositor_data (screen);
+  MutterPluginManager *mgr;
+
+  g_return_val_if_fail (info, FALSE);
+
+  mgr = info->plugin_mgr;
+
+  if (!mgr)
+    return FALSE;
+
+  return mutter_plugin_manager_constrain_window (mgr, window, constraint_info,
+                                                 priority, check_only);
+}
+
 static void
 pre_paint_windows (MetaCompScreen *info)
 {
