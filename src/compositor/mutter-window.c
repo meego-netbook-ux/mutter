@@ -1100,7 +1100,8 @@ mutter_window_show (MutterWindow   *self,
   priv = self->priv;
   info = meta_screen_get_compositor_data (priv->screen);
 
-  g_return_if_fail (!priv->visible);
+  if (priv->visible)
+    return;
 
   self->priv->visible = TRUE;
 
@@ -1142,7 +1143,8 @@ mutter_window_hide (MutterWindow  *self,
   priv = self->priv;
   info = meta_screen_get_compositor_data (priv->screen);
 
-  g_return_if_fail (priv->visible);
+  if (!priv->visible)
+    return;
 
   priv->visible = FALSE;
 
