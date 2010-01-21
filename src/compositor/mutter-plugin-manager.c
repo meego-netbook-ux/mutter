@@ -678,6 +678,10 @@ mutter_plugin_manager_get_shadow (MutterPluginManager *mgr,
   return NULL;
 }
 
+/*
+ * This function needs to return TRUE by default (meaning 'constraint already
+ * satisfied').
+ */
 gboolean
 mutter_plugin_manager_constrain_window (MutterPluginManager *mgr,
                                         MetaWindow          *window,
@@ -688,7 +692,7 @@ mutter_plugin_manager_constrain_window (MutterPluginManager *mgr,
   GList *l;
 
   if (!mgr)
-    return FALSE;
+    return TRUE;
 
   l = mgr->plugins;
 
@@ -706,5 +710,5 @@ mutter_plugin_manager_constrain_window (MutterPluginManager *mgr,
       l = l->next;
     }
 
-  return FALSE;
+  return TRUE;
 }
