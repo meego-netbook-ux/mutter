@@ -5349,3 +5349,9 @@ Atom meta_display_get_atom (MetaDisplay *display, MetaAtom meta_atom)
 
   return atoms[meta_atom - 1];
 }
+
+Window
+meta_display_get_leader_window (MetaDisplay *display)
+{
+  return display->leader_window;
+}
