@@ -2108,6 +2108,16 @@ process_tab_grab (MetaDisplay *display,
               return TRUE;
             }
           break;
+        case META_KEYBINDING_ACTION_NONE:
+          {
+            /*
+             * If this is simply user pressing the Shift key, we do not want
+             * to cancel the grab.
+             */
+            if (keysym == XK_Shift_L || keysym == XK_Shift_R)
+              return TRUE;
+          }
+
         default:
           break;
         }
