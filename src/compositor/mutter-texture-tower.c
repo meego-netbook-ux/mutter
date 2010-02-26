@@ -131,7 +131,7 @@ free_texture (CoglHandle texture)
   if (gl_target == GL_TEXTURE_RECTANGLE_ARB)
     glDeleteTextures (1, &gl_tex);
 
-  cogl_texture_unref (texture);
+  cogl_handle_unref (texture);
 }
 
 /**
@@ -180,7 +180,7 @@ mutter_texture_tower_set_base_texture (MutterTextureTower *tower,
 #endif
         }
 
-      cogl_texture_unref (tower->textures[0]);
+      cogl_handle_unref (tower->textures[0]);
     }
 
   tower->textures[0] = texture;
@@ -189,7 +189,7 @@ mutter_texture_tower_set_base_texture (MutterTextureTower *tower,
     {
       int width, height;
 
-      cogl_texture_ref (tower->textures[0]);
+      cogl_handle_ref (tower->textures[0]);
 
       width = cogl_texture_get_width (tower->textures[0]);
       height = cogl_texture_get_height (tower->textures[0]);
