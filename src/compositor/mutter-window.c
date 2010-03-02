@@ -48,6 +48,8 @@ struct _MutterWindowPrivate
    * texture */
   GdkRegion        *bounding_region;
 
+  guint             freeze_count;
+
   /*
    * These need to be counters rather than flags, since more plugins
    * can implement same effect; the practicality of stacking effects
@@ -66,7 +68,9 @@ struct _MutterWindowPrivate
   guint		    disposed               : 1;
   guint             redecorating           : 1;
 
-  guint		    needs_repair           : 1;
+  guint		    needs_damage_all       : 1;
+
+  guint		    needs_pixmap           : 1;
   guint		    needs_reshape          : 1;
   guint		    size_changed           : 1;
 
@@ -347,7 +351,8 @@ mutter_window_constructed (GObject *object)
   if (priv->attrs.class == InputOnly)
     priv->damage = None;
   else
-    priv->damage = XDamageCreate (xdisplay, xwindow, XDamageReportNonEmpty);
+    priv->damage = XDamageCreate (xdisplay, xwindow,
+                                  XDamageReportRawRectangles);
 
   format = XRenderFindVisualFormat (xdisplay, priv->attrs.visual);
 
@@ -812,6 +817,60 @@ mutter_window_showing_on_its_workspace (MutterWindow *self)
   return meta_window_showing_on_its_workspace (self->priv->window);
 }
 
+static void
+mutter_window_freeze (MutterWindow *self)
+{
+  self->priv->freeze_count++;
+}
+
+static void
+mutter_window_damage_all (MutterWindow *self)
+{
+  MutterWindowPrivate *priv = self->priv;
+  ClutterX11TexturePixmap *texture_x11 = CLUTTER_X11_TEXTURE_PIXMAP (priv->actor);
+  guint pixmap_width = 0;
+  guint pixmap_height = 0;
+
+  if (!priv->needs_damage_all)
+    return;
+
+  g_object_get (texture_x11,
+                "pixmap-width", &pixmap_width,
+                "pixmap-height", &pixmap_height,
+                NULL);
+
+  clutter_x11_texture_pixmap_update_area (texture_x11,
+                                          0,
+                                          0,
+                                          pixmap_width,
+                                          pixmap_height);
+
+  priv->needs_damage_all = FALSE;
+}
+
+static void
+mutter_window_thaw (MutterWindow *self)
+{
+  self->priv->freeze_count--;
+
+  if (G_UNLIKELY (self->priv->freeze_count < 0))
+    {
+      g_warning ("Error in freeze/thaw accounting.");
+      self->priv->freeze_count = 0;
+      return;
+    }
+
+  if (self->priv->freeze_count)
+    return;
+
+  /* Since we ignore damage events while a window is frozen for certain effects
+   * we may need to issue an update_area() covering the whole pixmap if we
+   * don't know what real damage has happened. */
+
+  if (self->priv->needs_damage_all)
+    mutter_window_damage_all (self);
+}
+
 gboolean
 mutter_window_effect_in_progress (MutterWindow *self)
 {
@@ -823,11 +882,11 @@ mutter_window_effect_in_progress (MutterWindow *self)
 }
 
 static void
-mutter_window_mark_for_repair (MutterWindow *self)
+mutter_window_queue_create_pixmap (MutterWindow *self)
 {
   MutterWindowPrivate *priv = self->priv;
 
-  priv->needs_repair = TRUE;
+  priv->needs_pixmap = TRUE;
 
   if (!priv->mapped)
     return;
@@ -844,12 +903,28 @@ mutter_window_mark_for_repair (MutterWindow *self)
 }
 
 static gboolean
+is_freeze_thaw_effect (gulong event)
+{
+  switch (event)
+  {
+  case MUTTER_PLUGIN_DESTROY:
+  case MUTTER_PLUGIN_MAXIMIZE:
+  case MUTTER_PLUGIN_UNMAXIMIZE:
+    return TRUE;
+    break;
+  default:
+    return FALSE;
+  }
+}
+
+static gboolean
 start_simple_effect (MutterWindow *self,
                      gulong        event)
 {
   MutterWindowPrivate *priv = self->priv;
   MetaCompScreen *info = meta_screen_get_compositor_data (priv->screen);
   gint *counter = NULL;
+  gboolean use_freeze_thaw = FALSE;
 
   if (!info->plugin_mgr)
     return FALSE;
@@ -874,6 +949,11 @@ start_simple_effect (MutterWindow *self,
 
   g_assert (counter);
 
+  use_freeze_thaw = is_freeze_thaw_effect (event);
+
+  if (use_freeze_thaw)
+    mutter_window_freeze (self);
+
   (*counter)++;
 
   if (!mutter_plugin_manager_event_simple (info->plugin_mgr,
@@ -881,6 +961,8 @@ start_simple_effect (MutterWindow *self,
                                            event))
     {
       (*counter)--;
+      if (use_freeze_thaw)
+        mutter_window_thaw (self);
       return FALSE;
     }
 
@@ -904,7 +986,7 @@ mutter_window_after_effects (MutterWindow *self)
   if (!meta_window_is_mapped (priv->window))
     mutter_window_detach (self);
 
-  if (priv->needs_repair)
+  if (priv->needs_pixmap)
     clutter_actor_queue_redraw (priv->actor);
 }
 
@@ -973,6 +1055,9 @@ mutter_window_effect_completed (MutterWindow *self,
     break;
   }
 
+  if (is_freeze_thaw_effect (event))
+    mutter_window_thaw (self);
+
   if (!mutter_window_effect_in_progress (self))
     mutter_window_after_effects (self);
 }
@@ -1005,7 +1090,7 @@ mutter_window_detach (MutterWindow *self)
   clutter_x11_texture_pixmap_set_pixmap (CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
                                          None);
 
-  mutter_window_mark_for_repair (self);
+  mutter_window_queue_create_pixmap (self);
 }
 
 void
@@ -1071,7 +1156,7 @@ mutter_window_sync_actor_position (MutterWindow *self)
       priv->attrs.height != window_rect.height)
     {
       priv->size_changed = TRUE;
-      mutter_window_mark_for_repair (self);
+      mutter_window_queue_create_pixmap (self);
     }
 
   /* XXX deprecated: please use meta_window_get_outer_rect instead */
@@ -1265,7 +1350,7 @@ mutter_window_new (MetaWindow *window)
 
   priv->mapped = meta_window_toplevel_is_mapped (priv->window);
   if (priv->mapped)
-    mutter_window_mark_for_repair (self);
+    mutter_window_queue_create_pixmap (self);
 
   mutter_window_sync_actor_position (self);
 
@@ -1294,7 +1379,7 @@ mutter_window_mapped (MutterWindow *self)
 
   priv->mapped = TRUE;
 
-  mutter_window_mark_for_repair (self);
+  mutter_window_queue_create_pixmap (self);
 }
 
 void
@@ -1310,7 +1395,7 @@ mutter_window_unmapped (MutterWindow *self)
     return;
 
   mutter_window_detach (self);
-  priv->needs_repair = FALSE;
+  priv->needs_pixmap = FALSE;
 }
 
 static void
@@ -1526,7 +1611,7 @@ mutter_window_reset_visible_regions (MutterWindow *self)
 }
 
 static void
-check_needs_repair (MutterWindow *self)
+check_needs_pixmap (MutterWindow *self)
 {
   MutterWindowPrivate *priv     = self->priv;
   MetaScreen          *screen   = priv->screen;
@@ -1537,7 +1622,7 @@ check_needs_repair (MutterWindow *self)
   Window               xwindow  = priv->xwindow;
   gboolean             full     = FALSE;
 
-  if (!priv->needs_repair)
+  if (!priv->needs_pixmap)
     return;
 
   if (!priv->mapped)
@@ -1613,74 +1698,50 @@ check_needs_repair (MutterWindow *self)
       full = TRUE;
     }
 
- /*
-   * TODO -- on some gfx hardware updating the whole texture instead of
-   * the individual rectangles is actually quicker, so we might want to
-   * make this a configurable option (on desktop HW with multiple pipelines
-   * it is usually quicker to just update the damaged parts).
-   *
-   * If we are using TFP we update the whole texture (this simply trigers
-   * the texture rebind).
-   */
-  if (full
-#ifdef HAVE_GLX_TEXTURE_PIXMAP
-      || (CLUTTER_GLX_IS_TEXTURE_PIXMAP (priv->actor) &&
-          clutter_glx_texture_pixmap_using_extension
-                  (CLUTTER_GLX_TEXTURE_PIXMAP (priv->actor)))
-#endif /* HAVE_GLX_TEXTURE_PIXMAP */
-      )
-    {
-      XDamageSubtract (xdisplay, priv->damage, None, None);
-
-      clutter_x11_texture_pixmap_update_area
-	(CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
-	 0,
-	 0,
-	 clutter_actor_get_width (priv->actor),
-	 clutter_actor_get_height (priv->actor));
-    }
-  else
-    {
-      XRectangle   *r_damage;
-      XRectangle    r_bounds;
-      XserverRegion parts;
-      int           i, r_count;
-
-      parts = XFixesCreateRegion (xdisplay, 0, 0);
-      XDamageSubtract (xdisplay, priv->damage, None, parts);
-
-      r_damage = XFixesFetchRegionAndBounds (xdisplay,
-					     parts,
-					     &r_count,
-					     &r_bounds);
-
-      if (r_damage)
-	{
-	  for (i = 0; i < r_count; ++i)
-	    {
-	      clutter_x11_texture_pixmap_update_area
-		(CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
-		 r_damage[i].x,
-		 r_damage[i].y,
-		 r_damage[i].width,
-		 r_damage[i].height);
-	    }
-	}
-
-      XFree (r_damage);
-      XFixesDestroyRegion (xdisplay, parts);
-    }
-
   meta_error_trap_pop (display, FALSE);
 
-  priv->needs_repair = FALSE;
+  priv->needs_pixmap = FALSE;
+}
+
+static gboolean
+is_frozen (MutterWindow *self)
+{
+  return self->priv->freeze_count ? TRUE : FALSE;
 }
 
 void
 mutter_window_process_damage (MutterWindow       *self,
 			      XDamageNotifyEvent *event)
 {
-  mutter_window_mark_for_repair (self);
+  MutterWindowPrivate *priv = self->priv;
+  ClutterX11TexturePixmap *texture_x11 = CLUTTER_X11_TEXTURE_PIXMAP (priv->actor);
+
+  if (is_frozen (self))
+    {
+      /* The window is frozen due to an effect in progress: we ignore damage
+       * here on the off chance that this will stop the corresponding
+       * texture_from_pixmap from being update.
+       *
+       * needs_damage_all tracks that some unknown damage happened while the
+       * window was frozen so that when the window becomes unfrozen we can
+       * issue a full window update to cover any lost damage.
+       *
+       * It should be noted that this is an unreliable mechanism since it's
+       * quite likely that drivers will aim to provide a zero-copy
+       * implementation of the texture_from_pixmap extension and in those cases
+       * any drawing done to the window is always immediately reflected in the
+       * texture regardless of damage event handling.
+       */
+      priv->needs_damage_all = TRUE;
+      return;
+    }
+
+
+  clutter_x11_texture_pixmap_update_area (texture_x11,
+                                          event->area.x,
+                                          event->area.y,
+                                          event->area.width,
+                                          event->area.height);
 }
 
 void
@@ -1751,17 +1812,15 @@ mutter_window_update_shape (MutterWindow   *self,
 void
 mutter_window_pre_paint (MutterWindow *self)
 {
-  MutterWindowPrivate *priv = self->priv;
-
-  /* The window is frozen due to a pending animation: we'll wait until
-   * the animation finishes to reshape and repair the window */
-  if (priv->destroy_in_progress    ||
-      priv->maximize_in_progress   ||
-      priv->unmaximize_in_progress)
-    return;
+  if (is_frozen (self))
+    {
+      /* The window is frozen due to a pending animation: we'll wait until
+       * the animation finishes to reshape and repair the window */
+      return;
+    }
 
   check_needs_reshape (self);
-  check_needs_repair (self);
+  check_needs_pixmap (self);
 }
 
 void
