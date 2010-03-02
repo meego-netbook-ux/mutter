@@ -347,7 +347,8 @@ mutter_window_constructed (GObject *object)
   if (priv->attrs.class == InputOnly)
     priv->damage = None;
   else
-    priv->damage = XDamageCreate (xdisplay, xwindow, XDamageReportNonEmpty);
+    priv->damage = XDamageCreate (xdisplay, xwindow,
+                                  XDamageReportRawRectangles);
 
   format = XRenderFindVisualFormat (xdisplay, priv->attrs.visual);
 
@@ -1611,64 +1612,6 @@ check_needs_repair (MutterWindow *self)
       full = TRUE;
     }
 
- /*
-   * TODO -- on some gfx hardware updating the whole texture instead of
-   * the individual rectangles is actually quicker, so we might want to
-   * make this a configurable option (on desktop HW with multiple pipelines
-   * it is usually quicker to just update the damaged parts).
-   *
-   * If we are using TFP we update the whole texture (this simply trigers
-   * the texture rebind).
-   */
-  if (full
-#ifdef HAVE_GLX_TEXTURE_PIXMAP
-      || (CLUTTER_GLX_IS_TEXTURE_PIXMAP (priv->actor) &&
-          clutter_glx_texture_pixmap_using_extension
-                  (CLUTTER_GLX_TEXTURE_PIXMAP (priv->actor)))
-#endif /* HAVE_GLX_TEXTURE_PIXMAP */
-      )
-    {
-      XDamageSubtract (xdisplay, priv->damage, None, None);
-
-      clutter_x11_texture_pixmap_update_area
-	(CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
-	 0,
-	 0,
-	 clutter_actor_get_width (priv->actor),
-	 clutter_actor_get_height (priv->actor));
-    }
-  else
-    {
-      XRectangle   *r_damage;
-      XRectangle    r_bounds;
-      XserverRegion parts;
-      int           i, r_count;
-
-      parts = XFixesCreateRegion (xdisplay, 0, 0);
-      XDamageSubtract (xdisplay, priv->damage, None, parts);
-
-      r_damage = XFixesFetchRegionAndBounds (xdisplay,
-					     parts,
-					     &r_count,
-					     &r_bounds);
-
-      if (r_damage)
-	{
-	  for (i = 0; i < r_count; ++i)
-	    {
-	      clutter_x11_texture_pixmap_update_area
-		(CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
-		 r_damage[i].x,
-		 r_damage[i].y,
-		 r_damage[i].width,
-		 r_damage[i].height);
-	    }
-	}
-
-      XFree (r_damage);
-      XFixesDestroyRegion (xdisplay, parts);
-    }
-
   meta_error_trap_pop (display, FALSE);
 
   priv->needs_repair = FALSE;
@@ -1678,7 +1621,14 @@ void
 mutter_window_process_damage (MutterWindow       *self,
 			      XDamageNotifyEvent *event)
 {
-  mutter_window_mark_for_repair (self);
+  MutterWindowPrivate *priv = self->priv;
+  ClutterX11TexturePixmap *texture_x11 =
+    CLUTTER_X11_TEXTURE_PIXMAP (priv->actor);
+  clutter_x11_texture_pixmap_update_area (texture_x11,
+                                          event->area.x,
+                                          event->area.y,
+                                          event->area.width,
+                                          event->area.height);
 }
 
 void
