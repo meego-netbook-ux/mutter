@@ -66,7 +66,7 @@ struct _MutterWindowPrivate
   guint		    disposed               : 1;
   guint             redecorating           : 1;
 
-  guint		    needs_repair           : 1;
+  guint		    needs_pixmap           : 1;
   guint		    needs_reshape          : 1;
   guint		    size_changed           : 1;
 
@@ -824,24 +824,11 @@ mutter_window_effect_in_progress (MutterWindow *self)
 }
 
 static void
-mutter_window_mark_for_repair (MutterWindow *self)
+mutter_window_queue_create_pixmap (MutterWindow *self)
 {
   MutterWindowPrivate *priv = self->priv;
 
-  priv->needs_repair = TRUE;
-
-  if (!priv->mapped)
-    return;
-
-  /* This will cause the compositor paint function to be run
-   * if the actor is visible or a clone of the actor is visible.
-   * if the actor isn't visible in any way, then we don't
-   * need to repair the window anyways, and can wait until
-   * the stage is redrawn for some other reason
-   *
-   * The compositor paint function repairs all windows.
-   */
-  clutter_actor_queue_redraw (priv->actor);
+  priv->needs_pixmap = TRUE;
 }
 
 static gboolean
@@ -905,7 +892,7 @@ mutter_window_after_effects (MutterWindow *self)
   if (!meta_window_is_mapped (priv->window))
     mutter_window_detach (self);
 
-  if (priv->needs_repair)
+  if (priv->needs_pixmap)
     clutter_actor_queue_redraw (priv->actor);
 }
 
@@ -1006,7 +993,7 @@ mutter_window_detach (MutterWindow *self)
   clutter_x11_texture_pixmap_set_pixmap (CLUTTER_X11_TEXTURE_PIXMAP (priv->actor),
                                          None);
 
-  mutter_window_mark_for_repair (self);
+  mutter_window_queue_create_pixmap (self);
 }
 
 void
@@ -1072,7 +1059,7 @@ mutter_window_sync_actor_position (MutterWindow *self)
       priv->attrs.height != window_rect.height)
     {
       priv->size_changed = TRUE;
-      mutter_window_mark_for_repair (self);
+      mutter_window_queue_create_pixmap (self);
     }
 
   /* XXX deprecated: please use meta_window_get_outer_rect instead */
@@ -1265,6 +1252,8 @@ mutter_window_new (MetaWindow *window)
   priv = self->priv;
 
   priv->mapped = meta_window_toplevel_is_mapped (priv->window);
+  if (priv->mapped)
+    mutter_window_queue_create_pixmap (self);
 
   mutter_window_sync_actor_position (self);
 
@@ -1293,7 +1282,7 @@ mutter_window_mapped (MutterWindow *self)
 
   priv->mapped = TRUE;
 
-  mutter_window_mark_for_repair (self);
+  mutter_window_queue_create_pixmap (self);
 }
 
 void
@@ -1309,7 +1298,7 @@ mutter_window_unmapped (MutterWindow *self)
     return;
 
   mutter_window_detach (self);
-  priv->needs_repair = FALSE;
+  priv->needs_pixmap = FALSE;
 }
 
 static void
@@ -1525,7 +1514,7 @@ mutter_window_reset_visible_regions (MutterWindow *self)
 }
 
 static void
-check_needs_repair (MutterWindow *self)
+check_needs_pixmap (MutterWindow *self)
 {
   MutterWindowPrivate *priv     = self->priv;
   MetaScreen          *screen   = priv->screen;
@@ -1536,7 +1525,7 @@ check_needs_repair (MutterWindow *self)
   Window               xwindow  = priv->xwindow;
   gboolean             full     = FALSE;
 
-  if (!priv->needs_repair)
+  if (!priv->needs_pixmap)
     return;
 
   if (!priv->mapped)
@@ -1614,7 +1603,7 @@ check_needs_repair (MutterWindow *self)
 
   meta_error_trap_pop (display, FALSE);
 
-  priv->needs_repair = FALSE;
+  priv->needs_pixmap = FALSE;
 }
 
 void
@@ -1709,7 +1698,7 @@ mutter_window_pre_paint (MutterWindow *self)
     return;
 
   check_needs_reshape (self);
-  check_needs_repair (self);
+  check_needs_pixmap (self);
 }
 
 void
