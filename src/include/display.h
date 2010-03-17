@@ -145,4 +145,6 @@ void meta_display_focus_the_no_focus_window (MetaDisplay *display,
                                              MetaScreen  *screen,
                                              guint32      timestamp);
 
+Window meta_display_get_leader_window (MetaDisplay *display);
+
 #endif
