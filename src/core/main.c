@@ -114,6 +114,7 @@ static void prefs_changed_callback (MetaPreference pref,
  * \param message     the message to log
  * \param user_data   arbitrary data (we ignore this)
  */
+#if 0
 static void
 log_handler (const gchar   *log_domain,
              GLogLevelFlags log_level,
@@ -123,6 +124,7 @@ log_handler (const gchar   *log_domain,
   meta_warning ("Log level %d: %s\n", log_level, message);
   meta_print_backtrace ();
 }
+#endif
 
 /**
  * Prints the version notice. This is shown when Mutter is called
@@ -492,11 +494,13 @@ main (int argc, char **argv)
   struct sigaction act;
   sigset_t empty_mask;
   MetaArguments meta_args;
+#if 0
   const gchar *log_domains[] = {
     NULL, G_LOG_DOMAIN, "Gtk", "Gdk", "GLib",
     "Pango", "GLib-GObject", "GThread"
   };
   guint i;
+#endif
   GIOChannel *channel;
   GOptionContext *ctx;
 
@@ -668,7 +672,7 @@ main (int argc, char **argv)
   meta_prefs_add_listener (prefs_changed_callback, NULL);
 
 
-#if 1
+#if 0
 
   for (i=0; i<G_N_ELEMENTS(log_domains); i++)
     g_log_set_handler (log_domains[i],
