@@ -393,6 +393,8 @@ meta_bug (const char *format, ...)
 
   fflush (out);
   
+  g_critical ("%s", str);
+
   g_free (str);
 
   meta_print_backtrace ();
@@ -426,6 +428,8 @@ meta_warning (const char *format, ...)
 
   fflush (out);
   
+  g_warning ("%s", str);
+
   g_free (str);
 }
 
@@ -454,6 +458,8 @@ meta_fatal (const char *format, ...)
 
   fflush (out);
   
+  g_critical ("%s", str);
+
   g_free (str);
 
   meta_exit (META_EXIT_ERROR);
