@@ -2554,8 +2554,6 @@ meta_prefs_get_workspace_name (int i)
 {
   g_return_val_if_fail (i >= 0 && i < MAX_REASONABLE_WORKSPACES, NULL);
 
-  g_assert (workspace_names[i] != NULL);
-
   meta_topic (META_DEBUG_PREFS,
               "Getting workspace name for %d: \"%s\"\n",
               i, workspace_names[i]);
