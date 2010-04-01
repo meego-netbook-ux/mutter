@@ -72,9 +72,11 @@ mutter_shadow_create_for_window (MetaCompositor *compositor, MutterWindow *mcw)
                                   MAX_TILE_SZ,
                                   MAX_TILE_SZ);
 
-  shadow->actor       = frame;
-  shadow->attach_left = SHADOW_OFFSET_X;
-  shadow->attach_top  = SHADOW_OFFSET_Y;
+  shadow->actor         = frame;
+  shadow->attach_left   = SHADOW_OFFSET_X;
+  shadow->attach_top    = SHADOW_OFFSET_Y;
+  shadow->attach_right  = SHADOW_RADIUS;
+  shadow->attach_bottom = SHADOW_RADIUS;
 
   return shadow;
 }
