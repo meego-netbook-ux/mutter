@@ -5320,7 +5320,23 @@ meta_display_get_focus_window (MetaDisplay *display)
   return display->focus_window;
 }
 
-int 
+/**
+ * meta_display_get_expected_focus_window:
+ * @display: a #MetaDisplay
+ *
+ * Get the window that we last set input focus on; this is not necessarily the
+ * same as the window which currently has focus; the latter can be obtained
+ * using meta_display_get_focus_window().
+ *
+ * Return Value: (transfer none): The expected focus window
+ */
+MetaWindow *
+meta_display_get_expected_focus_window (MetaDisplay *display)
+{
+  return display->expected_focus_window;
+}
+
+int
 meta_display_get_damage_event_base (MetaDisplay *display)
 {
   return display->damage_event_base;
