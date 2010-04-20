@@ -484,7 +484,18 @@ meta_window_new (MetaDisplay *display,
 
   if (XGetWindowAttributes (display->xdisplay,xwindow, &attrs))
    {
-      if(meta_error_trap_pop_with_return (display, TRUE) != Success)
+     int e = meta_error_trap_pop_with_return (display, TRUE);
+
+     /*
+      * HACK
+      *
+      * XGetWindowAttributes () is only supposed to generate BadWindow or
+      * BadDrawable errors; this test ensures that we do not bail out here if
+      * we catch some miscelaneous error that is unrelated to this call and
+      * was only flushed out be the trap. If we do, issue warning so we can
+      * investigate this further.
+      */
+     if (e == BadWindow || e == BadDrawable)
        {
           meta_verbose ("Failed to get attributes for window 0x%lx\n",
                         xwindow);
@@ -492,6 +503,9 @@ meta_window_new (MetaDisplay *display,
           meta_display_ungrab (display);
           return NULL;
        }
+     else if (e)
+       g_warning (G_STRLOC ": Caught unexpected error %d", e);
+
       window = meta_window_new_with_attrs (display, xwindow,
                                            must_be_viewable,
                                            META_COMP_EFFECT_CREATE,
