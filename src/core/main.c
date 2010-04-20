@@ -609,8 +609,6 @@ main (int argc, char **argv)
     }
 #endif
 
-  meta_set_syncing (meta_args.sync || (g_getenv ("MUTTER_SYNC") != NULL));
-
   if (meta_args.print_version)
     version ();
 
@@ -763,6 +761,8 @@ main (int argc, char **argv)
   if (!meta_display_open ())
     meta_exit (META_EXIT_ERROR);
 
+  meta_set_syncing (meta_args.sync || (g_getenv ("MUTTER_SYNC") != NULL));
+  
   /*
    * This seems the first time we can set up the cursor properly. The display
    * seems to set up the theme at the point it opens, but the cursor size
