@@ -5973,10 +5973,13 @@ meta_window_notify_focus (MetaWindow *window,
           if (window->frame)
             meta_frame_queue_draw (window->frame);
 
-          meta_error_trap_push (window->display);
-          XInstallColormap (window->display->xdisplay,
-                            window->colormap);
-          meta_error_trap_pop (window->display, FALSE);
+          if (window->colormap)
+            {
+              meta_error_trap_push (window->display);
+              XInstallColormap (window->display->xdisplay,
+                                window->colormap);
+              meta_error_trap_pop (window->display, FALSE);
+            }
 
           /* move into FOCUSED_WINDOW layer */
           meta_window_update_layer (window);
@@ -6030,10 +6033,13 @@ meta_window_notify_focus (MetaWindow *window,
           if (window->frame)
             meta_frame_queue_draw (window->frame);
 
-          meta_error_trap_push (window->display);
-          XUninstallColormap (window->display->xdisplay,
-                              window->colormap);
-          meta_error_trap_pop (window->display, FALSE);
+          if (window->colormap)
+            {
+              meta_error_trap_push (window->display);
+              XUninstallColormap (window->display->xdisplay,
+                                  window->colormap);
+              meta_error_trap_pop (window->display, FALSE);
+            }
 
           /* move out of FOCUSED_WINDOW layer */
           meta_window_update_layer (window);
