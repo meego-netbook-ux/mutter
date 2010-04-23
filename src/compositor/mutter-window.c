@@ -48,7 +48,7 @@ struct _MutterWindowPrivate
    * texture */
   GdkRegion        *bounding_region;
 
-  guint             freeze_count;
+  gint              freeze_count;
 
   /*
    * These need to be counters rather than flags, since more plugins
@@ -1276,6 +1276,7 @@ mutter_window_maximize (MutterWindow       *self,
   clutter_actor_set_size (CLUTTER_ACTOR (self), old_rect->width, old_rect->height);
 
   self->priv->maximize_in_progress++;
+  mutter_window_freeze (self);
 
   if (!info->plugin_mgr ||
       !mutter_plugin_manager_event_maximize (info->plugin_mgr,
@@ -1286,6 +1287,7 @@ mutter_window_maximize (MutterWindow       *self,
 
     {
       self->priv->maximize_in_progress--;
+      mutter_window_thaw (self);
     }
 }
 
@@ -1303,6 +1305,7 @@ mutter_window_unmaximize (MutterWindow      *self,
   clutter_actor_set_size (CLUTTER_ACTOR (self), old_rect->width, old_rect->height);
 
   self->priv->unmaximize_in_progress++;
+  mutter_window_freeze (self);
 
   if (!info->plugin_mgr ||
       !mutter_plugin_manager_event_maximize (info->plugin_mgr,
@@ -1312,6 +1315,7 @@ mutter_window_unmaximize (MutterWindow      *self,
 					     new_rect->width, new_rect->height))
     {
       self->priv->unmaximize_in_progress--;
+      mutter_window_thaw (self);
     }
 }
 
