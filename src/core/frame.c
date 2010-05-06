@@ -291,7 +291,7 @@ meta_frame_get_flags (MetaFrame *frame)
   if (META_WINDOW_MAXIMIZED (frame->window))
     flags |= META_FRAME_MAXIMIZED;
 
-  if (frame->window->fullscreen)
+  if (frame->window->fullscreen || frame->window->fullscreen_after_placement)
     flags |= META_FRAME_FULLSCREEN;
 
   if (frame->is_flashing)
