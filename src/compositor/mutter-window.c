@@ -69,6 +69,7 @@ struct _MutterWindowPrivate
   guint             redecorating           : 1;
 
   guint		    needs_damage_all       : 1;
+  guint		    received_damage        : 1;
 
   guint		    needs_pixmap           : 1;
   guint		    needs_reshape          : 1;
@@ -352,7 +353,7 @@ mutter_window_constructed (GObject *object)
     priv->damage = None;
   else
     priv->damage = XDamageCreate (xdisplay, xwindow,
-                                  XDamageReportRawRectangles);
+                                  XDamageReportBoundingBox);
 
   format = XRenderFindVisualFormat (xdisplay, priv->attrs.visual);
 
@@ -1742,6 +1743,7 @@ mutter_window_process_damage (MutterWindow       *self,
                                           event->area.y,
                                           event->area.width,
                                           event->area.height);
+  priv->received_damage = TRUE;
 }
 
 void
@@ -1812,11 +1814,23 @@ mutter_window_update_shape (MutterWindow   *self,
 void
 mutter_window_pre_paint (MutterWindow *self)
 {
+  MutterWindowPrivate *priv = self->priv;
+  MetaScreen          *screen   = priv->screen;
+  MetaDisplay         *display  = meta_screen_get_display (screen);
+  Display             *xdisplay = meta_display_get_xdisplay (display);
+
   if (is_frozen (self))
     {
       /* The window is frozen due to a pending animation: we'll wait until
        * the animation finishes to reshape and repair the window */
       return;
+    }
+
+  if (priv->received_damage)
+    {
+      /* XXX: this is a synchronous request, per window with damage! */
+      XDamageSubtract (xdisplay, priv->damage, None, None);
+      priv->received_damage = FALSE;
     }
 
   check_needs_reshape (self);
